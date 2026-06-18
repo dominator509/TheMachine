@@ -1,0 +1,155 @@
+import { describe, it, expect } from "vitest";
+import {
+  createHealthHandler,
+  createWorkspaceHandler,
+  createRepoHandler,
+  createPlanHandler,
+  createRunHandler,
+  createValidationHandler,
+  createProviderHandler,
+  createMCPHandler,
+  createPluginHandler,
+  createReadinessHandler,
+} from "@the-machine/service";
+import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
+
+describe("service handlers integration", () => {
+  it("health handler returns ok", () => {
+    const handler = createHealthHandler("The Machine", "0.1.0", Date.now());
+    const res = handler.check({});
+    expect(res.status).toBe("ok");
+    expect(res.platform).toBe("The Machine");
+    expect(res.checks.core).toBe(true);
+  });
+
+  it("health handler accepts detail flag", () => {
+    const handler = createHealthHandler("Test", "1.0.0", Date.now());
+    const res = handler.check({ detail: true });
+    expect(res.status).toBe("ok");
+    expect(res.uptimeMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("workspace handler returns pending for new path", () => {
+    const handler = createWorkspaceHandler();
+    const res = handler.get({ path: "/tmp/test-ws" });
+    expect(res.status).toBe("pending");
+    expect(res.path).toBe("/tmp/test-ws");
+  });
+
+  it("workspace handler lists workspaces", () => {
+    const handler = createWorkspaceHandler();
+    handler.get({ path: "/ws/a" });
+    handler.get({ path: "/ws/b" });
+    const list = handler.list();
+    expect(list.workspaces).toHaveLength(2);
+  });
+
+  it("repo handler discovers profile", () => {
+    const handler = createRepoHandler();
+    const res = handler.discover({ workspaceId: "ws-1" as EntityId, rootPath: "/repo" });
+    expect(res.packageManager).toBe("pnpm");
+    expect(res.hasGit).toBe(true);
+  });
+
+  it("plan handler loads and retrieves", () => {
+    const handler = createPlanHandler();
+    const loaded = handler.load("/plans/ep-1.md");
+    expect(loaded.status).toBe("pending");
+    const got = handler.get({ planId: "/plans/ep-1.md" as EntityId });
+    expect(got).not.toBeNull();
+    expect(got!.id).toBe("/plans/ep-1.md");
+  });
+
+  it("plan handler returns null for unknown", () => {
+    const handler = createPlanHandler();
+    const got = handler.get({ planId: "nonexistent" as EntityId });
+    expect(got).toBeNull();
+  });
+
+  it("plan handler lists loaded plans", () => {
+    const handler = createPlanHandler();
+    handler.load("/plans/a.md");
+    handler.load("/plans/b.md");
+    const list = handler.list();
+    expect(list.plans).toHaveLength(2);
+  });
+
+  it("run handler starts and retrieves", () => {
+    const handler = createRunHandler();
+    const run = handler.start({ workspaceId: "ws-1" as EntityId, planId: "ep-1" as EntityId });
+    expect(run.status).toBe("active");
+    expect(run.execPlanId).toBe("ep-1");
+    const got = handler.get(run.id);
+    expect(got).not.toBeNull();
+  });
+
+  it("run handler lists runs", () => {
+    const handler = createRunHandler();
+    handler.start({ workspaceId: "ws-1" as EntityId, planId: "ep-1" as EntityId });
+    handler.start({ workspaceId: "ws-1" as EntityId, planId: "ep-2" as EntityId });
+    const list = handler.list();
+    expect(list.runs).toHaveLength(2);
+  });
+
+  it("validation handler records and lists", () => {
+    const handler = createValidationHandler();
+    const res = handler.record(
+      { runId: "run-1" as EntityId, command: "test" },
+      true,
+      0,
+      "all good",
+      "info",
+    );
+    expect(res.passed).toBe(true);
+    const list = handler.list("run-1" as EntityId);
+    expect(list.validations).toHaveLength(1);
+  });
+
+  it("provider handler registers and lists", () => {
+    const handler = createProviderHandler();
+    handler.register(
+      "p-1" as EntityId,
+      "local-llm",
+      "local" as ProviderTier,
+      "http://localhost:8080",
+      ["model-x"],
+      30000,
+    );
+    const list = handler.list();
+    expect(list.providers).toHaveLength(1);
+    expect(list.providers[0]?.name).toBe("local-llm");
+  });
+
+  it("MCP handler registers and lists", () => {
+    const handler = createMCPHandler();
+    handler.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", [
+      "read-file",
+      "write-file",
+    ]);
+    const list = handler.list();
+    expect(list.servers).toHaveLength(1);
+    expect(list.servers[0]?.toolCount).toBe(2);
+  });
+
+  it("plugin handler registers and lists", () => {
+    const handler = createPluginHandler();
+    handler.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3);
+    const list = handler.list();
+    expect(list.plugins).toHaveLength(1);
+    expect(list.plugins[0]?.enabled).toBe(true);
+  });
+
+  it("readiness handler reports ready", () => {
+    const handler = createReadinessHandler();
+    const res = handler.check({ workspaceId: "ws-1" as EntityId });
+    expect(res.overall).toBe("ready");
+    expect(res.gates).toHaveLength(3);
+  });
+
+  it("readiness handler filters by subsystem", () => {
+    const handler = createReadinessHandler();
+    const res = handler.check({ workspaceId: "ws-1" as EntityId, subsystem: "core" });
+    expect(res.gates).toHaveLength(1);
+    expect(res.gates[0]?.subsystem).toBe("core");
+  });
+});

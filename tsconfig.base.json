@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+    "outDir": "${configDir}/dist",
+    "baseUrl": "${configDir}",
+    "ignoreDeprecations": "5.0",
+    "paths": {
+      "@the-machine/core": ["./packages/core/src/index.ts"],
+      "@the-machine/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@the-machine/service": ["./packages/service/src/index.ts"],
+      "@the-machine/service/gui": ["./packages/service/src/gui/index.ts"],
+      "@the-machine/providers": ["./packages/providers/src/index.ts"],
+      "@the-machine/mcp": ["./packages/mcp/src/index.ts"],
+      "@the-machine/storage": ["./packages/storage/src/index.ts"],
+      "@the-machine/plugin-sdk": ["./packages/plugin-sdk/src/index.ts"],
+      "@the-machine/security": ["./packages/security/src/index.ts"],
+      "@the-machine/observability": ["./packages/observability/src/index.ts"],
+      "@the-machine/ui-components": ["./packages/ui-components/src/index.ts"]
+    }
+  }
+}

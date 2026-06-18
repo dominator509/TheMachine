@@ -1,0 +1,130 @@
+{
+  "name": "fft-chibi",
+  "label": "War Council — FFT Samurai",
+  "description": "Final Fantasy Tactics-style chibi samurai training and moving around a 16-bit dojo landscape. 24 legendary warriors at their stations.",
+  "style": "fft-chibi",
+  "version": "1.0.0",
+  "sprites": {
+    "1":  { "name": "Oda Nobunaga",       "defaultState": "idle", "scale": 1.0 },
+    "2":  { "name": "Tokugawa Ieyasu",    "defaultState": "idle", "scale": 1.0 },
+    "3":  { "name": "Miyamoto Musashi",   "defaultState": "idle", "scale": 1.0 },
+    "4":  { "name": "Tsukahara Bokuden",  "defaultState": "idle", "scale": 1.0 },
+    "5":  { "name": "Date Masamune",      "defaultState": "idle", "scale": 1.0 },
+    "6":  { "name": "Honda Tadakatsu",    "defaultState": "idle", "scale": 1.0 },
+    "7":  { "name": "Ii Naomasa",         "defaultState": "idle", "scale": 1.0 },
+    "8":  { "name": "Toyotomi Hideyoshi", "defaultState": "idle", "scale": 1.0 },
+    "9":  { "name": "Minamoto no Yoshitsune", "defaultState": "idle", "scale": 1.0 },
+    "10": { "name": "Minamoto no Yoritomo",   "defaultState": "idle", "scale": 1.0 },
+    "11": { "name": "Sasaki Kojirō",      "defaultState": "idle", "scale": 1.0 },
+    "12": { "name": "Kato Kiyomasa",      "defaultState": "idle", "scale": 1.0 },
+    "13": { "name": "Shimazu Yoshihiro",  "defaultState": "idle", "scale": 1.0 },
+    "14": { "name": "Uesugi Kenshin",     "defaultState": "idle", "scale": 1.0 },
+    "15": { "name": "Ashikaga Takauji",   "defaultState": "idle", "scale": 1.0 },
+    "16": { "name": "Yasuke",             "defaultState": "idle", "scale": 1.0 },
+    "17": { "name": "Tomoe Gozen",        "defaultState": "idle", "scale": 1.0 },
+    "18": { "name": "Takeda Shingen",     "defaultState": "idle", "scale": 1.0 },
+    "19": { "name": "Sanada Yukimura",    "defaultState": "idle", "scale": 1.0 },
+    "20": { "name": "Mori Motonari",      "defaultState": "idle", "scale": 1.0 },
+    "21": { "name": "Torii Mototada",     "defaultState": "idle", "scale": 1.0 },
+    "22": { "name": "Kusunoki Masashige", "defaultState": "idle", "scale": 1.0 },
+    "23": { "name": "Yagyū Munenori",     "defaultState": "idle", "scale": 1.0 },
+    "24": { "name": "Hattori Hanzo",      "defaultState": "idle", "scale": 1.0 }
+  },
+  "stations": {
+    "planning": {
+      "name": "War Room",
+      "background": "assets/fft-chibi/war-room.png",
+      "gridCols": 8, "gridRows": 5, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 }, { "col": 3, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }, { "col": 2, "row": 1 }, { "col": 3, "row": 1 }
+      ]
+    },
+    "coding": {
+      "name": "Dojo — Training Grounds",
+      "background": "assets/fft-chibi/dojo.png",
+      "gridCols": 8, "gridRows": 5, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 }, { "col": 3, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }, { "col": 2, "row": 1 }, { "col": 3, "row": 1 }
+      ]
+    },
+    "code-review": {
+      "name": "Scroll Archive",
+      "background": "assets/fft-chibi/archive.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+      ]
+    },
+    "qa-testing": {
+      "name": "Testing Grounds",
+      "background": "assets/fft-chibi/testing-grounds.png",
+      "gridCols": 8, "gridRows": 5, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+      ]
+    },
+    "security-scan": {
+      "name": "Watchtower",
+      "background": "assets/fft-chibi/watchtower.png",
+      "gridCols": 4, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }
+      ]
+    },
+    "deploy": {
+      "name": "Castle Gates",
+      "background": "assets/fft-chibi/castle-gates.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+      ]
+    },
+    "gate-clear": {
+      "name": "Bridge of Judgment",
+      "background": "assets/fft-chibi/bridge.png",
+      "gridCols": 4, "gridRows": 3, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }
+      ]
+    },
+    "kaizen": {
+      "name": "Zen Garden",
+      "background": "assets/fft-chibi/zen-garden.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }
+      ]
+    },
+    "takt": {
+      "name": "Drum Tower",
+      "background": "assets/fft-chibi/drum-tower.png",
+      "gridCols": 4, "gridRows": 3, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }
+      ]
+    },
+    "dependency-check": {
+      "name": "Supply Depot",
+      "background": "assets/fft-chibi/supply-depot.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }
+      ]
+    }
+  },
+  "chrome": {
+    "primary": "#2d1b4e",
+    "secondary": "#c8a96e",
+    "text": "#f5eedc",
+    "panel": "rgba(0,0,0,0.75)"
+  },
+  "bgm": "assets/fft-chibi/dojo-ambience.ogg"
+}

@@ -1,0 +1,45 @@
+{
+  "name": "the-machine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first agentic coding platform",
+  "packageManager": "pnpm@11.6.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "format:check": "prettier --check .",
+    "typecheck": "turbo run typecheck",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "playwright test",
+    "build": "turbo run build",
+    "build:release": "node tools/release/build-release.mjs",
+    "security:check": "node tools/security/check-secrets.mjs",
+    "audit": "pnpm audit --audit-level high || true",
+    "smoke": "node tools/smoke/smoke-test.mjs",
+    "production:readiness": "node tools/readiness/production-readiness-check.mjs",
+    "db:setup": "node tools/db/setup.mjs",
+    "db:migration:create": "node tools/db/create-migration.mjs",
+    "db:migrate": "node tools/db/migrate.mjs",
+    "db:migrate:rollback": "node tools/db/rollback.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^25.9.3",
+    "esbuild": "^0.28.1",
+    "eslint": "^9.20.0",
+    "prettier": "^3.5.0",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.61.0",
+    "vitest": "^3.1.0"
+  },
+  "dependencies": {
+    "sharp": "^0.35.1"
+  }
+}

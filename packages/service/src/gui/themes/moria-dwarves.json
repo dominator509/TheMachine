@@ -1,0 +1,840 @@
+{
+  "name": "moria-dwarves",
+  "label": "Khazad-dûm: Mithril Mines",
+  "description": "Tolkien-themed dwarven aesthetic — 24 dwarf agents mining mithril in the vast halls of Khazad-dûm (Moria). Deep stone, torchlight, and dwarven craftsmanship.",
+  "style": "tolkien-fantasy",
+  "version": "2.0.0",
+  "tileSize": 32,
+  "sprites": {
+    "1": {
+      "name": "Durin VII",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-1-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-1-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "2": {
+      "name": "Balin",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-2-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-2-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "3": {
+      "name": "Dwalin",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-3-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-3-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "4": {
+      "name": "Óin",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-4-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-4-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "5": {
+      "name": "Glóin",
+      "defaultState": "guard",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-5-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "guard": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-5-guard.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "6": {
+      "name": "Bifur",
+      "defaultState": "craft",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-6-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "craft": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-6-craft.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "7": {
+      "name": "Bofur",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-7-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-7-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "8": {
+      "name": "Bombur",
+      "defaultState": "forge",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-8-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "forge": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-8-forge.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "9": {
+      "name": "Ori",
+      "defaultState": "read",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-9-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "read": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-9-read.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "10": {
+      "name": "Dori",
+      "defaultState": "count",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-10-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "count": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-10-count.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "11": {
+      "name": "Nori",
+      "defaultState": "carry",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-11-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "carry": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-11-carry.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "12": {
+      "name": "Fíli",
+      "defaultState": "sneak",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-12-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "sneak": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-12-sneak.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "13": {
+      "name": "Kíli",
+      "defaultState": "write",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-13-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "write": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-13-write.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "14": {
+      "name": "Thorin III",
+      "defaultState": "forge",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-14-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "forge": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-14-forge.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "15": {
+      "name": "Gimli",
+      "defaultState": "aim",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-15-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "aim": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-15-aim.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "16": {
+      "name": "Flói",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-16-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-16-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "17": {
+      "name": "Frar",
+      "defaultState": "guard",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-17-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "guard": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-17-guard.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "18": {
+      "name": "Lóni",
+      "defaultState": "mine",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-18-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "mine": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-18-mine.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "19": {
+      "name": "Náli",
+      "defaultState": "map",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-19-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "map": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-19-map.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "20": {
+      "name": "Thráin",
+      "defaultState": "wander",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-20-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "wander": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-20-wander.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "21": {
+      "name": "Thrór",
+      "defaultState": "guard",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-21-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "guard": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-21-guard.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "22": {
+      "name": "Fundin",
+      "defaultState": "craft",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-22-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "craft": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-22-craft.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "23": {
+      "name": "Náin",
+      "defaultState": "forge",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-23-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "forge": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-23-forge.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    },
+    "24": {
+      "name": "Dáin",
+      "defaultState": "forge",
+      "scale": 1,
+      "animations": {
+        "idle": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-24-idle.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 600
+        },
+        "forge": {
+          "src": "/assets/moria-dwarves/sprites/dwarf-24-forge.png",
+          "width": 32,
+          "height": 32,
+          "frames": 2,
+          "frameDurationMs": 500
+        }
+      }
+    }
+  },
+  "stations": {
+    "council-chamber": {
+      "label": "Council Chamber",
+      "tileSize": 32,
+      "gridWidth": 8,
+      "gridHeight": 5,
+      "backgroundImage": "/assets/moria-dwarves/council-chamber.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-4",
+          "label": "Post 5",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "great-forge": {
+      "label": "Great Forge",
+      "tileSize": 32,
+      "gridWidth": 8,
+      "gridHeight": 5,
+      "backgroundImage": "/assets/moria-dwarves/great-forge.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-4",
+          "label": "Post 5",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "rune-archives": {
+      "label": "Rune Archives",
+      "tileSize": 32,
+      "gridWidth": 6,
+      "gridHeight": 4,
+      "backgroundImage": "/assets/moria-dwarves/rune-archives.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "testing-cavern": {
+      "label": "Testing Cavern",
+      "tileSize": 32,
+      "gridWidth": 8,
+      "gridHeight": 5,
+      "backgroundImage": "/assets/moria-dwarves/testing-cavern.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-4",
+          "label": "Post 5",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "durins-door": {
+      "label": "Durins Door",
+      "tileSize": 32,
+      "gridWidth": 4,
+      "gridHeight": 4,
+      "backgroundImage": "/assets/moria-dwarves/durins-door.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "bridge": {
+      "label": "Bridge",
+      "tileSize": 32,
+      "gridWidth": 6,
+      "gridHeight": 4,
+      "backgroundImage": "/assets/moria-dwarves/bridge.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "great-gates": {
+      "label": "Great Gates",
+      "tileSize": 32,
+      "gridWidth": 4,
+      "gridHeight": 3,
+      "backgroundImage": "/assets/moria-dwarves/great-gates.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "mithril-vein": {
+      "label": "Mithril Vein",
+      "tileSize": 32,
+      "gridWidth": 6,
+      "gridHeight": 4,
+      "backgroundImage": "/assets/moria-dwarves/mithril-vein.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "drum-chamber": {
+      "label": "Drum Chamber",
+      "tileSize": 32,
+      "gridWidth": 4,
+      "gridHeight": 3,
+      "backgroundImage": "/assets/moria-dwarves/drum-chamber.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        }
+      ]
+    },
+    "treasury": {
+      "label": "Treasury",
+      "tileSize": 32,
+      "gridWidth": 6,
+      "gridHeight": 4,
+      "backgroundImage": "/assets/moria-dwarves/treasury.png",
+      "backgroundCss": "",
+      "slots": [
+        {
+          "id": "slot-0",
+          "label": "Post 1",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-1",
+          "label": "Post 2",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-2",
+          "label": "Post 3",
+          "maxAgents": 3
+        },
+        {
+          "id": "slot-3",
+          "label": "Post 4",
+          "maxAgents": 3
+        }
+      ]
+    }
+  },
+  "chrome": {
+    "backgroundColor": "#0a0a14",
+    "panelBackground": "#1a1428",
+    "borderColor": "#3a2a1a",
+    "textColor": "#d0c8a0",
+    "textDimColor": "#887a50",
+    "accentColor": "#c8a040",
+    "accentGlow": "rgba(200,160,64,0.3)",
+    "successColor": "#4ade80",
+    "warningColor": "#fbbf24",
+    "dangerColor": "#f87147",
+    "infoColor": "#60a5fa",
+    "fontMono": "'Courier New', Courier, monospace",
+    "fontUi": "system-ui, -apple-system, sans-serif"
+  },
+  "audio": {
+    "bgm": null,
+    "sfx": {}
+  }
+}

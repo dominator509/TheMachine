@@ -1,0 +1,28 @@
+{
+  "name": "@the-machine/service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./gui": {
+      "import": "./dist/gui/index.js",
+      "types": "./dist/gui/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "@the-machine/core": "workspace:*",
+    "@the-machine/observability": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  }
+}

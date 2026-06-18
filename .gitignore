@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE & editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing & coverage
+coverage/
+test-results/
+playwright-report/
+.nyc_output/
+
+# Release artifacts
+release/
+/release/
+
+# Temp
+tmp/
+/tmp/
+*.tmp
+
+# Screenshots
+screenshots/
+
+# Agent heartbeats & runtime files
+.agent/
+.*_heartbeat
+COMM_BUFFER.md
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+.git-credentials

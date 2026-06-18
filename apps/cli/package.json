@@ -1,0 +1,29 @@
+{
+  "name": "@the-machine/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "machine": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "@the-machine/core": "workspace:*",
+    "@the-machine/service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@the-machine/security",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "@the-machine/core": "workspace:*",
+    "@the-machine/agent-runtime": "workspace:*",
+    "@the-machine/mcp": "workspace:*",
+    "@the-machine/providers": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  }
+}

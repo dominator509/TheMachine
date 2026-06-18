@@ -1,0 +1,130 @@
+{
+  "name": "hobbiton",
+  "label": "Hobbiton — The Shire Workshop",
+  "description": "8-bit hobbits tending gardens, baking pies, and crafting in their cozy hillside homes across the Shire. Agent stations are hobbit holes, the Green Dragon Inn, and the Party Tree meadow.",
+  "style": "tolkien-fantasy",
+  "version": "1.0.0",
+  "sprites": {
+    "1":  { "name": "Bilbo Baggins",       "defaultState": "write", "scale": 0.8 },
+    "2":  { "name": "Frodo Baggins",        "defaultState": "walk", "scale": 0.8 },
+    "3":  { "name": "Samwise Gamgee",       "defaultState": "garden", "scale": 0.8 },
+    "4":  { "name": "Meriadoc Brandybuck",  "defaultState": "idle", "scale": 0.8 },
+    "5":  { "name": "Peregrin Took",        "defaultState": "idle", "scale": 0.7 },
+    "6":  { "name": "Farmer Maggot",        "defaultState": "garden", "scale": 0.9 },
+    "7":  { "name": "Rosie Cotton",         "defaultState": "serve", "scale": 0.7 },
+    "8":  { "name": "The Gaffer",           "defaultState": "garden", "scale": 0.9 },
+    "9":  { "name": "Fredegar Bolger",      "defaultState": "idle", "scale": 0.8 },
+    "10": { "name": "Lobelia Sackville-Baggins", "defaultState": "sneak", "scale": 0.8 },
+    "11": { "name": "Hamfast Gamgee",       "defaultState": "garden", "scale": 0.9 },
+    "12": { "name": "Daisy Boffin",         "defaultState": "bake", "scale": 0.7 },
+    "13": { "name": "Tolman Cotton",        "defaultState": "farm", "scale": 0.9 },
+    "14": { "name": "Wilcome Took",         "defaultState": "idle", "scale": 0.8 },
+    "15": { "name": "Milo Burrows",         "defaultState": "idle", "scale": 0.8 },
+    "16": { "name": "Gorbadoc Brandybuck",  "defaultState": "read", "scale": 0.9 },
+    "17": { "name": "Estella Bolger",       "defaultState": "bake", "scale": 0.7 },
+    "18": { "name": "Paladin Took II",      "defaultState": "idle", "scale": 0.9 },
+    "19": { "name": "Everard Proudfoot",    "defaultState": "walk", "scale": 0.8 },
+    "20": { "name": "Doderic Brandybuck",   "defaultState": "idle", "scale": 0.8 },
+    "21": { "name": "Odo Proudfoot",        "defaultState": "idle", "scale": 0.8 },
+    "22": { "name": "Poppy Chubb-Baggins",  "defaultState": "bake", "scale": 0.7 },
+    "23": { "name": "Halfred Greenhand",    "defaultState": "garden", "scale": 0.8 },
+    "24": { "name": "Rowan Greenhand",      "defaultState": "farm", "scale": 0.8 }
+  },
+  "stations": {
+    "planning": {
+      "name": "Bag End Parlour",
+      "background": "assets/hobbiton/bag-end-parlour.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }, { "col": 2, "row": 1 }
+      ]
+    },
+    "coding": {
+      "name": "Hobbiton Workshop Row",
+      "background": "assets/hobbiton/workshop-row.png",
+      "gridCols": 8, "gridRows": 5, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 }, { "col": 3, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }, { "col": 2, "row": 1 }, { "col": 3, "row": 1 }
+      ]
+    },
+    "code-review": {
+      "name": "The Ivy Bush Inn",
+      "background": "assets/hobbiton/ivy-bush-inn.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+      ]
+    },
+    "qa-testing": {
+      "name": "Michel Delving Market Fair",
+      "background": "assets/hobbiton/market-fair.png",
+      "gridCols": 8, "gridRows": 5, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+      ]
+    },
+    "security-scan": {
+      "name": "Bounders' Watchpost",
+      "background": "assets/hobbiton/bounders-watch.png",
+      "gridCols": 4, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }
+      ]
+    },
+    "deploy": {
+      "name": "Bucklebury Ferry Landing",
+      "background": "assets/hobbiton/bucklebury-ferry.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+      ]
+    },
+    "gate-clear": {
+      "name": "Brandywine Bridge",
+      "background": "assets/hobbiton/brandywine-bridge.png",
+      "gridCols": 4, "gridRows": 3, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }
+      ]
+    },
+    "kaizen": {
+      "name": "The Party Tree Meadow",
+      "background": "assets/hobbiton/party-tree.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }
+      ]
+    },
+    "takt": {
+      "name": "Green Dragon Inn",
+      "background": "assets/hobbiton/green-dragon.png",
+      "gridCols": 4, "gridRows": 3, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }
+      ]
+    },
+    "dependency-check": {
+      "name": "Mathom-House (Storage)",
+      "background": "assets/hobbiton/mathom-house.png",
+      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "slots": [
+        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 }
+      ]
+    }
+  },
+  "chrome": {
+    "primary": "#3d5a1e",
+    "secondary": "#c8a951",
+    "text": "#f5eedc",
+    "panel": "rgba(30,20,0,0.75)"
+  },
+  "bgm": "assets/hobbiton/shire-pastoral.ogg"
+}

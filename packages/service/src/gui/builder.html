@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated GUI Builder — The Machine</title>
+<style>
+/* ===== Reset & Variables ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --pr: #1a0a2e; --sec: #e0a040; --tx: #f0e6d0; --pn: rgba(10,5,20,0.88); --ac: #40c0e0;
+  --bg: #0a0510; --radius: 6px; --font: 'Segoe UI', system-ui, sans-serif; --mono: 'Cascadia Code', monospace;
+}
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--tx);
+  min-height: 100vh;
+}
+
+/* ===== Header ===== */
+.builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: var(--pn);
+  border-bottom: 2px solid var(--sec);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.builder-header h1 {
+  font-size: 1.2rem;
+  letter-spacing: 0.5px;
+}
+.builder-header h1 span { opacity: 0.5; font-weight: 400; }
+.header-actions { display:flex; gap:8px; flex-wrap:wrap }
+
+/* ===== Buttons ===== */
+.btn {
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+  color: var(--tx);
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn:hover { background: rgba(255,255,255,0.12); border-color: var(--sec); }
+.btn.primary { background: var(--sec); color: #000; border-color: var(--sec); font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.danger { border-color: #f44; color: #f44; }
+.btn.danger:hover { background: rgba(255,0,0,0.15); }
+.btn.sm { padding: 3px 8px; font-size: 0.72rem; }
+
+/* ===== Main Layout ===== */
+.builder-main {
+  display: flex;
+  height: calc(100vh - 60px);
+}
+.editor-panel {
+  width: 420px;
+  min-width: 380px;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--pn);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.preview-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  position: relative;
+}
+
+/* ===== Form Sections ===== */
+.section {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.section-header {
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sec);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.section-header:hover { background: rgba(255,255,255,0.06); }
+.section-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.section-body.collapsed { display: none; }
+
+/* ===== Form Fields ===== */
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 0.72rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+.field input, .field textarea, .field select {
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.3);
+  color: var(--tx);
+  font-size: 0.82rem;
+  font-family: var(--font);
+  outline: none;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--ac); }
+.field textarea { min-height: 50px; resize: vertical; font-size: 0.75rem; }
+.field-row { display: flex; gap: 8px; }
+.field-row .field { flex: 1; }
+.color-input-wrap { display: flex; align-items: center; gap: 8px; }
+.color-input-wrap input[type="color"] {
+  width: 32px; height: 32px; border: none; border-radius: 4px; cursor: pointer; padding: 0;
+}
+.color-input-wrap input[type="text"] { flex: 1; }
+
+/* ===== Station Card ===== */
+.station-card {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.station-card-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.station-card-row input { flex: 1; }
+.station-card-row input.sm { width: 50px; flex: none; }
+.slot-chip {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.slot-chip .remove-slot { cursor: pointer; opacity: 0.4; }
+.slot-chip .remove-slot:hover { opacity: 1; color: #f44; }
+
+/* ===== Sprite Card ===== */
+.sprite-card {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sprite-card .sprite-id {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--sec);
+  min-width: 30px;
+}
+.sprite-card input { flex: 1; }
+.sprite-card select { width: 100px; }
+
+/* ===== Preview Dashboard ===== */
+.preview-stations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.preview-station {
+  background: var(--pn);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: transform 0.2s;
+}
+.preview-station:hover { transform: translateY(-2px); }
+.preview-station-header {
+  padding: 8px 12px;
+  background: linear-gradient(135deg, var(--pr), rgba(0,0,0,0.6));
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--sec);
+  text-transform: uppercase;
+}
+.preview-station-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  min-height: 40px;
+}
+.preview-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.preview-agent .pa-avatar {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fff;
+}
+.preview-empty {
+  text-align: center;
+  padding: 40px;
+  opacity: 0.4;
+}
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  background: #0f0;
+  color: #000;
+  font-weight: 700;
+  font-size: 0.82rem;
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 2s forwards;
+  z-index: 999;
+}
+.toast.error { background: #f44; }
+@keyframes toastIn  { from { opacity: 0; transform: translateY(10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(-10px); } }
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .builder-main { flex-direction: column; }
+  .editor-panel { width: 100%; min-width: 0; max-height: 50vh; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .preview-panel { flex: none; min-height: 40vh; }
+}
+</style>
+</head>
+<body>
+
+<header class="builder-header">
+  <h1>🎨 <span>Animated GUI Builder</span></h1>
+  <div class="header-actions">
+    <button class="btn" id="btn-load-theme">📂 Load Theme</button>
+    <button class="btn" id="btn-save-theme">💾 Save to Server</button>
+    <button class="btn primary" id="btn-export">⬇ Export JSON</button>
+    <a href="/" class="btn" style="text-decoration:none">⚔ Dashboard</a>
+  </div>
+</header>
+
+<div class="builder-main">
+  <!-- ======== EDITOR ======== -->
+  <aside class="editor-panel" id="editor-panel">
+
+    <!-- Metadata -->
+    <div class="section">
+      <div class="section-header" data-section="meta">📋 Theme Metadata <span>▾</span></div>
+      <div class="section-body" id="section-meta">
+        <div class="field-row">
+          <div class="field"><label>Name</label><input id="ed-name" placeholder="my-theme"></div>
+          <div class="field"><label>Version</label><input id="ed-version" value="1.0.0"></div>
+        </div>
+        <div class="field"><label>Label</label><input id="ed-label" placeholder="My Theme"></div>
+        <div class="field"><label>Description</label><textarea id="ed-desc" placeholder="Describe the theme..."></textarea></div>
+        <div class="field"><label>Style</label>
+          <select id="ed-style">
+            <option value="custom">Custom</option>
+            <option value="16-bit-samurai">16-bit Samurai</option>
+            <option value="tolkien-fantasy">Tolkien Fantasy</option>
+            <option value="aquarium">Aquarium</option>
+            <option value="pixel-art">Pixel Art</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chrome Colors -->
+    <div class="section">
+      <div class="section-header" data-section="chrome">🎨 Chrome Colors <span>▾</span></div>
+      <div class="section-body" id="section-chrome">
+        <div class="field"><label>Primary</label>
+          <div class="color-input-wrap">
+            <input type="color" id="ed-primary" value="#1a0a2e">
+            <input type="text" id="ed-primary-txt" value="#1a0a2e">
+          </div>
+        </div>
+        <div class="field"><label>Secondary</label>
+          <div class="color-input-wrap">
+            <input type="color" id="ed-secondary" value="#e0a040">
+            <input type="text" id="ed-secondary-txt" value="#e0a040">
+          </div>
+        </div>
+        <div class="field"><label>Text</label>
+          <div class="color-input-wrap">
+            <input type="color" id="ed-text" value="#f0e6d0">
+            <input type="text" id="ed-text-txt" value="#f0e6d0">
+          </div>
+        </div>
+        <div class="field"><label>Panel BG</label>
+          <div class="color-input-wrap">
+            <input type="color" id="ed-panel" value="#1a0a2e">
+            <input type="text" id="ed-panel-txt" value="rgba(10,5,20,0.88)">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stations -->
+    <div class="section">
+      <div class="section-header" data-section="stations">🏰 Stations <span>▾</span></div>
+      <div class="section-body" id="section-stations">
+        <div id="stations-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button class="btn" id="btn-add-station">+ Add Station</button>
+      </div>
+    </div>
+
+    <!-- Sprites -->
+    <div class="section">
+      <div class="section-header" data-section="sprites">🧑‍💻 Agent Sprites (24) <span>▾</span></div>
+      <div class="section-body" id="section-sprites">
+        <div id="sprites-list" style="display:flex;flex-direction:column;gap:5px"></div>
+        <button class="btn sm" id="btn-reset-sprites">↺ Reset to defaults</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ======== PREVIEW ======== -->
+  <main class="preview-panel" id="preview-panel">
+    <h2 style="font-size:1rem;color:var(--sec);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      👁 Live Preview
+      <span style="font-size:0.7rem;opacity:0.5;font-weight:400">— updates as you edit</span>
+    </h2>
+    <div class="preview-stations" id="preview-grid">
+      <div class="preview-empty">Stations will appear here as you add them</div>
+    </div>
+  </main>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ============================================================================
+// GUI Builder Engine
+// ============================================================================
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// --- Template Theme ---
+function newTheme() {
+  return {
+    name: '',
+    label: '',
+    description: '',
+    style: 'custom',
+    version: '1.0.0',
+    chrome: { primary: '#1a0a2e', secondary: '#e0a040', text: '#f0e6d0', panel: 'rgba(10,5,20,0.88)' },
+    stations: {},
+    sprites: {},
+  };
+}
+
+let theme = newTheme();
+
+// --- Toast ---
+function toast(msg, isError) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  $('#toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// --- Collapsible Sections ---
+$$('.section-header').forEach(h => {
+  h.addEventListener('click', () => {
+    const body = h.nextElementSibling;
+    body.classList.toggle('collapsed');
+    h.querySelector('span').textContent = body.classList.contains('collapsed') ? '▸' : '▾';
+  });
+});
+
+// --- Sync Form → Theme ---
+function syncFromForm() {
+  theme.name = $('#ed-name').value;
+  theme.label = $('#ed-label').value;
+  theme.description = $('#ed-desc').value;
+  theme.style = $('#ed-style').value;
+  theme.version = $('#ed-version').value;
+  theme.chrome = {
+    primary: $('#ed-primary-txt').value,
+    secondary: $('#ed-secondary-txt').value,
+    text: $('#ed-text-txt').value,
+    panel: $('#ed-panel-txt').value,
+  };
+  updatePreview();
+}
+
+// --- Sync Theme → Form ---
+function syncToForm() {
+  $('#ed-name').value = theme.name;
+  $('#ed-label').value = theme.label;
+  $('#ed-desc').value = theme.description;
+  $('#ed-style').value = theme.style;
+  $('#ed-version').value = theme.version;
+  $('#ed-primary').value = theme.chrome.primary;
+  $('#ed-primary-txt').value = theme.chrome.primary;
+  $('#ed-secondary').value = theme.chrome.secondary;
+  $('#ed-secondary-txt').value = theme.chrome.secondary;
+  $('#ed-text').value = theme.chrome.text;
+  $('#ed-text-txt').value = theme.chrome.text;
+  $('#ed-panel').value = theme.chrome.primary; // fallback
+  $('#ed-panel-txt').value = theme.chrome.panel;
+
+  renderStationEditor();
+  renderSpriteEditor();
+  updatePreview();
+}
+
+// --- Color Sync ---
+['primary','secondary','text','panel'].forEach(k => {
+  $(`#ed-${k}`).addEventListener('input', () => {
+    $(`#ed-${k}-txt`).value = $(`#ed-${k}`).value;
+    syncFromForm();
+  });
+  $(`#ed-${k}-txt`).addEventListener('input', syncFromForm);
+});
+
+// --- Form listeners ---
+['ed-name','ed-label','ed-desc','ed-style','ed-version'].forEach(id => {
+  $(`#${id}`).addEventListener('input', syncFromForm);
+  if ($(`#${id}`).tagName === 'SELECT') $(`#${id}`).addEventListener('change', syncFromForm);
+});
+
+// --- Station Editor ---
+function renderStationEditor() {
+  const list = $('#stations-list');
+  const ids = Object.keys(theme.stations);
+  list.innerHTML = ids.map(id => {
+    const st = theme.stations[id];
+    const slotChips = (st.slots || []).map((s,i) =>
+      `<span class="slot-chip">${s.col},${s.row}<span class="remove-slot" data-station="${id}" data-slot="${i}">×</span></span>`
+    ).join(' ');
+    return `
+      <div class="station-card" data-sid="${id}">
+        <div class="station-card-row">
+          <input value="${id}" placeholder="station-id" class="station-id-input" data-old="${id}" style="width:110px;flex:none">
+          <input value="${st.name}" placeholder="Display name" class="station-name-input" style="flex:1">
+          <button class="btn sm danger remove-station" data-sid="${id}">×</button>
+        </div>
+        <div class="station-card-row">
+          <label style="font-size:0.7rem;opacity:0.6">Grid:</label>
+          <input value="${st.gridCols || 6}" class="sm station-cols" placeholder="cols" title="Columns" style="width:44px">
+          <span style="font-size:0.65rem;opacity:0.4">×</span>
+          <input value="${st.gridRows || 4}" class="sm station-rows" placeholder="rows" title="Rows" style="width:44px">
+          <label style="font-size:0.7rem;opacity:0.6;margin-left:8px">Tile:</label>
+          <input value="${st.tileSize || 32}" class="sm station-tile" title="Tile size" style="width:44px">
+          <button class="btn sm add-slot-btn" data-sid="${id}">+ Slot</button>
+        </div>
+        <div style="font-size:0.7rem">Slots: ${slotChips || '<em style="opacity:0.4">none</em>'}</div>
+      </div>`;
+  }).join('');
+
+  // Event delegation for dynamic elements
+  list.querySelectorAll('.station-id-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const old = inp.dataset.old;
+      const nu = inp.value;
+      if (old && old !== nu && theme.stations[old]) {
+        theme.stations[nu] = theme.stations[old];
+        delete theme.stations[old];
+        inp.dataset.old = nu;
+      }
+      syncFromForm();
+    });
+  });
+  list.querySelectorAll('.station-name-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const sid = inp.closest('.station-card').dataset.sid;
+      if (theme.stations[sid]) theme.stations[sid].name = inp.value;
+      updatePreview();
+    });
+  });
+  list.querySelectorAll('.station-cols,.station-rows,.station-tile').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const sid = inp.closest('.station-card').dataset.sid;
+      if (!theme.stations[sid]) return;
+      if (inp.classList.contains('station-cols')) theme.stations[sid].gridCols = parseInt(inp.value)||6;
+      if (inp.classList.contains('station-rows')) theme.stations[sid].gridRows = parseInt(inp.value)||4;
+      if (inp.classList.contains('station-tile')) theme.stations[sid].tileSize = parseInt(inp.value)||32;
+      updatePreview();
+    });
+  });
+  list.querySelectorAll('.remove-station').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sid = btn.dataset.sid;
+      delete theme.stations[sid];
+      renderStationEditor();
+      updatePreview();
+    });
+  });
+  list.querySelectorAll('.remove-slot').forEach(el => {
+    el.addEventListener('click', () => {
+      const sid = el.dataset.station;
+      const idx = parseInt(el.dataset.slot);
+      if (theme.stations[sid]) {
+        theme.stations[sid].slots.splice(idx, 1);
+        renderStationEditor();
+        updatePreview();
+      }
+    });
+  });
+  list.querySelectorAll('.add-slot-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sid = btn.dataset.sid;
+      if (!theme.stations[sid]) return;
+      if (!theme.stations[sid].slots) theme.stations[sid].slots = [];
+      // Add slot at next position
+      const len = theme.stations[sid].slots.length;
+      theme.stations[sid].slots.push({ col: len % (theme.stations[sid].gridCols||6), row: Math.floor(len / (theme.stations[sid].gridCols||6)) });
+      renderStationEditor();
+      updatePreview();
+    });
+  });
+}
+
+$('#btn-add-station').addEventListener('click', () => {
+  let id = 'new-station';
+  let i = 1;
+  while (theme.stations[id]) id = `new-station-${i++}`;
+  theme.stations[id] = {
+    name: 'New Station',
+    gridCols: 6, gridRows: 4, tileSize: 32,
+    slots: [{ col: 0, row: 0 }, { col: 1, row: 0 }, { col: 0, row: 1 }],
+  };
+  renderStationEditor();
+  updatePreview();
+});
+
+// --- Sprite Editor ---
+const DEFAULT_SPRITE_NAMES = [
+  'Agent Alpha','Agent Beta','Agent Gamma','Agent Delta','Agent Epsilon',
+  'Agent Zeta','Agent Eta','Agent Theta','Agent Iota','Agent Kappa',
+  'Agent Lambda','Agent Mu','Agent Nu','Agent Xi','Agent Omicron',
+  'Agent Pi','Agent Rho','Agent Sigma','Agent Tau','Agent Upsilon',
+  'Agent Phi','Agent Chi','Agent Psi','Agent Omega',
+];
+
+function renderSpriteEditor() {
+  const list = $('#sprites-list');
+  let html = '';
+  for (let i = 1; i <= 24; i++) {
+    const s = theme.sprites[String(i)] || { name: DEFAULT_SPRITE_NAMES[i-1], defaultState: 'idle', scale: 1.0 };
+    html += `
+      <div class="sprite-card">
+        <span class="sprite-id">#${i}</span>
+        <input value="${s.name}" class="sprite-name" data-id="${i}" placeholder="Name">
+        <select class="sprite-state" data-id="${i}">
+          ${['idle','walk','mine','forge','write','read','guard','swim','hover','craft','build','scan','deploy','sneak','bake','farm','serve'].map(st =>
+            `<option value="${st}" ${s.defaultState === st ? 'selected' : ''}>${st}</option>`
+          ).join('')}
+        </select>
+        <input type="number" value="${s.scale}" class="sprite-scale" data-id="${i}" min="0.3" max="3" step="0.1" style="width:56px" title="Scale">
+      </div>`;
+  }
+  list.innerHTML = html;
+
+  list.querySelectorAll('.sprite-name,.sprite-state,.sprite-scale').forEach(el => {
+    el.addEventListener('input', () => {
+      const id = el.dataset.id;
+      if (!theme.sprites[id]) theme.sprites[id] = { name: '', defaultState: 'idle', scale: 1.0 };
+      if (el.classList.contains('sprite-name')) theme.sprites[id].name = el.value;
+      if (el.classList.contains('sprite-state')) theme.sprites[id].defaultState = el.value;
+      if (el.classList.contains('sprite-scale')) theme.sprites[id].scale = parseFloat(el.value);
+      updatePreview();
+    });
+  });
+}
+
+$('#btn-reset-sprites').addEventListener('click', () => {
+  theme.sprites = {};
+  for (let i = 1; i <= 24; i++) {
+    theme.sprites[String(i)] = { name: DEFAULT_SPRITE_NAMES[i-1], defaultState: 'idle', scale: 1.0 };
+  }
+  renderSpriteEditor();
+  updatePreview();
+  toast('Sprites reset to defaults');
+});
+
+// --- Live Preview ---
+const AGENT_COLORS = [
+  '#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4',
+  '#46f0f0','#f032e6','#bcf60c','#fabebe','#008080','#e6beff',
+  '#9a6324','#fffac8','#800000','#aaffc3','#808000','#ffd8b1',
+  '#000075','#808080','#ff4500','#7fffd4','#8a2be2','#ff69b4'
+];
+
+function updatePreview() {
+  const grid = $('#preview-grid');
+  const root = document.documentElement.style;
+
+  // Apply chrome colors live
+  if (theme.chrome) {
+    root.setProperty('--pr', theme.chrome.primary);
+    root.setProperty('--sec', theme.chrome.secondary);
+    root.setProperty('--tx', theme.chrome.text);
+    root.setProperty('--pn', theme.chrome.panel);
+  }
+
+  const ids = Object.keys(theme.stations);
+  if (ids.length === 0) {
+    grid.innerHTML = '<div class="preview-empty">Stations will appear here as you add them</div>';
+    return;
+  }
+
+  // Map stations to agent assignments: distribute 24 agents across first 24 slots
+  let slotAssignments = [];
+  ids.forEach(sid => {
+    const st = theme.stations[sid];
+    (st.slots || []).forEach((slot, si) => {
+      slotAssignments.push({ station: sid, slot, stationName: st.name });
+    });
+  });
+
+  grid.innerHTML = ids.map(sid => {
+    const st = theme.stations[sid];
+    const assigned = [];
+    // Find which agents are in this station's slots
+    slotAssignments.forEach((sa, idx) => {
+      if (sa.station === sid && idx < 24) {
+        const sprite = theme.sprites[String(idx + 1)];
+        assigned.push({ id: idx + 1, name: sprite?.name || DEFAULT_SPRITE_NAMES[idx], color: AGENT_COLORS[idx] });
+      }
+    });
+
+    const agentsHTML = assigned.map(a => {
+      const initial = a.name.charAt(0).toUpperCase();
+      return `<span class="preview-agent" title="${a.name}"><span class="pa-avatar" style="background:${a.color}">${initial}</span>${a.name.split(' ').pop()}</span>`;
+    }).join('');
+
+    return `
+      <div class="preview-station">
+        <div class="preview-station-header">${st.name}</div>
+        <div class="preview-station-slots">${agentsHTML || '<span style="font-size:0.7rem;opacity:0.4;padding:4px">no agents assigned</span>'}</div>
+      </div>`;
+  }).join('');
+}
+
+// --- Load Theme ---
+$('#btn-load-theme').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/themes');
+    const data = await res.json();
+    if (!data.themes.length) { toast('No themes found on server', true); return; }
+
+    const names = data.themes.map(t => t.name);
+    const name = prompt('Enter theme name to load:\n\nAvailable: ' + names.join(', '), names[0]);
+    if (!name) return;
+
+    const tres = await fetch(`/api/theme/${name}`);
+    if (!tres.ok) { toast('Theme not found', true); return; }
+    theme = await tres.json();
+    syncToForm();
+    toast(`Loaded: ${theme.label}`);
+  } catch (e) {
+    toast('Failed to load themes', true);
+  }
+});
+
+// --- Save to Server ---
+$('#btn-save-theme').addEventListener('click', async () => {
+  syncFromForm();
+  if (!theme.name) { toast('Enter a theme name first', true); return; }
+  try {
+    const res = await fetch('/api/save-theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(theme),
+    });
+    const data = await res.json();
+    if (data.ok) toast(`Saved: ${theme.name}`);
+    else toast(data.error || 'Save failed', true);
+  } catch (e) {
+    toast('Server save failed (server may not support /api/save-theme yet)', true);
+    // Fallback: download
+    downloadTheme();
+  }
+});
+
+// --- Export / Download ---
+$('#btn-export').addEventListener('click', () => {
+  syncFromForm();
+  downloadTheme();
+});
+
+function downloadTheme() {
+  const json = JSON.stringify(theme, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${theme.name || 'theme'}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`Downloaded: ${theme.name || 'theme'}.json`);
+}
+
+// --- Init ---
+function init() {
+  // Default sprites
+  for (let i = 1; i <= 24; i++) {
+    theme.sprites[String(i)] = { name: DEFAULT_SPRITE_NAMES[i-1], defaultState: 'idle', scale: 1.0 };
+  }
+  // Default stations
+  theme.stations = {
+    'planning':       { name: 'Planning Room', gridCols: 6, gridRows: 4, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:2,row:0},{col:0,row:1},{col:1,row:1},{col:2,row:1}] },
+    'coding':         { name: 'Code Forge', gridCols: 8, gridRows: 5, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:2,row:0},{col:3,row:0},{col:0,row:1},{col:1,row:1},{col:2,row:1},{col:3,row:1}] },
+    'code-review':    { name: 'Review Chamber', gridCols: 6, gridRows: 4, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:2,row:0},{col:0,row:1},{col:1,row:1}] },
+    'qa-testing':     { name: 'Testing Grounds', gridCols: 8, gridRows: 5, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:2,row:0},{col:0,row:1},{col:1,row:1}] },
+    'security-scan':  { name: 'Watchpost', gridCols: 4, gridRows: 4, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:0,row:1}] },
+    'deploy':         { name: 'Launch Bay', gridCols: 6, gridRows: 4, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:0,row:1},{col:1,row:1}] },
+    'gate-clear':     { name: 'Gate Bridge', gridCols: 4, gridRows: 3, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0}] },
+    'kaizen':         { name: 'Deep Delve', gridCols: 6, gridRows: 4, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:0,row:1}] },
+    'takt':           { name: 'Sync Arena', gridCols: 4, gridRows: 3, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0}] },
+    'dependency-check': { name: 'Vault', gridCols: 6, gridRows: 4, tileSize: 32, slots: [{col:0,row:0},{col:1,row:0},{col:0,row:1}] },
+  };
+  theme.name = 'new-theme';
+  theme.label = 'New Theme';
+
+  syncToForm();
+}
+
+init();
+</script>
+</body>
+</html>

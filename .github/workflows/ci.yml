@@ -1,0 +1,58 @@
+name: CI — The Machine
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Preflight
+        run: ./scripts/preflight.sh
+
+      - name: Lint
+        run: ./scripts/lint.sh
+
+      - name: Format check
+        run: ./scripts/format-check.sh
+
+      - name: Typecheck
+        run: ./scripts/typecheck.sh
+
+      - name: Unit tests
+        run: ./scripts/test-unit.sh
+
+      - name: Integration tests
+        run: ./scripts/test-integration.sh
+
+      - name: E2E tests
+        run: ./scripts/test-e2e.sh
+
+      - name: Build
+        run: ./scripts/build.sh
+
+      - name: Security check
+        run: ./scripts/security-check.sh
+
+      - name: Dependency audit
+        run: ./scripts/dependency-audit.sh
+
+      - name: Smoke test
+        run: ./scripts/smoke-test.sh
