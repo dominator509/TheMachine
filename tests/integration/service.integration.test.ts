@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   createHealthHandler,
   createWorkspaceHandler,
@@ -10,6 +13,7 @@ import {
   createMCPHandler,
   createPluginHandler,
   createReadinessHandler,
+  ServiceStore,
 } from "@the-machine/service";
 import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
 
@@ -142,8 +146,8 @@ describe("service handlers integration", () => {
   it("readiness handler reports ready", () => {
     const handler = createReadinessHandler();
     const res = handler.check({ workspaceId: "ws-1" as EntityId });
-    expect(res.overall).toBe("ready");
-    expect(res.gates).toHaveLength(3);
+    expect(res.overall).toBe("degraded");
+    expect(res.gates).toHaveLength(12);
   });
 
   it("readiness handler filters by subsystem", () => {
@@ -151,5 +155,51 @@ describe("service handlers integration", () => {
     const res = handler.check({ workspaceId: "ws-1" as EntityId, subsystem: "core" });
     expect(res.gates).toHaveLength(1);
     expect(res.gates[0]?.subsystem).toBe("core");
+  });
+
+  it("loads a real ExecPlan into SQLite and runs the first milestone validation", () => {
+    const dir = mkdtempSync(join(tmpdir(), "machine-service-"));
+    const dbPath = join(dir, "machine.sqlite");
+    const planPath = join(dir, "EP-test.md");
+    writeFileSync(
+      planPath,
+      `# EP-test: Fixture Plan
+
+## 8. Milestones
+
+### M0: First
+
+- Goal: Prove the runner can execute a validation command.
+- Validation command: \`node -e "console.log('ok')"\`
+- Expected result: ok
+- Recovery instruction: Stop on failure.
+
+## 12. Progress
+
+- [ ] M0: First.
+`,
+      "utf-8",
+    );
+
+    const store = new ServiceStore(dbPath);
+    const planHandler = createPlanHandler(store);
+    const runHandler = createRunHandler(store);
+    const validationHandler = createValidationHandler(store);
+
+    const plan = planHandler.load(planPath);
+    expect(plan.title).toBe("EP-test: Fixture Plan");
+    expect(plan.milestoneCount).toBe(1);
+    expect(plan.currentMilestone).toBe("M0");
+
+    const run = runHandler.start({ workspaceId: "default" as EntityId, planId: plan.id });
+    expect(run.status).toBe("completed");
+    expect(run.commandCount).toBe(1);
+    expect(run.validationCount).toBe(1);
+
+    const validations = validationHandler.list(run.id);
+    expect(validations.validations).toHaveLength(1);
+    expect(validations.validations[0]?.passed).toBe(true);
+    expect(planHandler.get({ planId: plan.id })?.completedMilestones).toBe(1);
+    store.close();
   });
 });

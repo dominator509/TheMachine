@@ -8,37 +8,13 @@ This document defines The Machine's intended architecture, boundaries, import ru
 
 The Machine is a local-first agentic development platform with a Windows 10+ desktop GUI, cross-platform CLI, local service/runtime, SQLite persistence, provider adapters, MCP adapters, plugin SDK, security layer, and observability layer. It executes repository-local blueprint files and one active ExecPlan at a time.
 
-## Current State (Discovered — EP-000 M4)
+## Current State (EP-011)
 
-The repository is a **pure blueprint pack** — no source code exists yet. The current structure is limited to documentation, agent orchestration files, and shell scripts:
+The repository is an implemented TypeScript monorepo, not a blueprint-only pack. It contains CLI and desktop apps, 12 workspace packages, SQLite storage, provider and MCP adapters, plugin SDK components, security and observability packages, tests, release tooling, smoke tooling, readiness tooling, and database tools.
 
-```
-/
-  AGENTS.md, ARCHITECTURE.md, ASSUMPTIONS.md, COMMANDS.md
-  COMM_BUFFER.md, CONTRIBUTING.md, DECISIONS.md, DEPLOYMENT.md
-  ENVIRONMENT.md, OBSERVABILITY.md, OPERATIONS.md, PRODUCTION_READINESS.md
-  PROJECT_BRIEF.md, RELEASE.md, ROADMAP.md, ROLLBACK.md, SECURITY.md, TESTING.md
-  .gitignore
-  .agent/
-    checklists/       # 9 checklists (agent-readiness through validation)
-    execplans/        # 11 ExecPlans (EP-000 through EP-010)
-    prompts/          # 4 agent prompt templates
-    scripts/          # Agent-side helper scripts
-    specs/            # 9 specs (SPEC-000 through SPEC-008)
-    templates/        # 5 document templates
-  scripts/            # 14 shell scripts (preflight, build, test, etc.)
-  docs/               # Empty — reserved for future generated documentation
-```
+EP-011 closed the critical functionality blockers found in `FUNCTIONALITY_AUDIT_BRIEFING.md`: the built CLI starts, Windows readiness path checks pass, smoke prerequisites are explicit, release bundles are ESM, ExecPlans parse and persist to SQLite, provider adapters use real HTTP request paths, MCP stdio JSON-RPC invocation is implemented, DB tools call storage migration APIs, and runtime readiness reports all 12 subsystems.
 
-Missing from intended structure (to be created in EP-001+):
-
-- `apps/desktop`, `apps/cli` — no GUI or CLI yet
-- `packages/core`, `packages/agent-runtime`, `packages/service`, `packages/providers`, `packages/mcp`, `packages/storage`, `packages/plugin-sdk`, `packages/security`, `packages/observability`, `packages/ui-components` — no packages yet
-- `tools/db`, `tools/security`, `tools/smoke`, `tools/readiness` — no tools yet
-- `tests/fixtures`, `tests/integration`, `tests/e2e` — no tests yet
-- `package.json`, `pnpm-workspace.yaml`, `tsconfig.json` — no package manager or build config yet
-
-This is a **greenfield repository**. All source code, infrastructure, and application-level config must be scaffolded in EP-001 onward.
+Remaining architectural risk: plugin execution is still scoped to trusted first-party/interface isolation unless a later ExecPlan adds a true sandbox for third-party plugins.
 
 ## Intended Repository Map
 
@@ -181,18 +157,18 @@ Define contract in a spec, implement in `providers`, `mcp`, or `plugin-sdk`, add
 - Plugin/MCP permissions explicit?
 - Tests and docs updated?
 
-## Current Implementation State (v0.1.0)
+## Current Implementation State (v0.1.0, EP-011)
 
 The Machine is implemented as a TypeScript monorepo managed by pnpm workspaces with full typecheck, test, build, and release tooling.
 
-### Packages (10 packages, 176 source files)
+### Packages
 
 - **core** — Domain primitives: ExecPlan lifecycle, stop conditions (33 typed), retry budget, readiness gates, validation. Zero infrastructure imports.
 - **storage** — SQLite persistence via better-sqlite3, migrations, repositories.
-- **service** — Orchestration layer bridging CLI/desktop to runtime, workspace management.
-- **providers** — LLM provider adapters (local, anthropic, openai) with factory pattern.
-- **mcp** — MCP server type definitions and registry.
-- **plugin-sdk** — Plugin type exports (stub — full loader pending PR Remediation Sprint).
+- **service** — Orchestration layer bridging CLI/desktop to runtime, workspace management, Markdown ExecPlan parsing, repo-local SQLite service store, and synchronous milestone validation runs.
+- **providers** — OpenAI-compatible, Anthropic-compatible, and local-model HTTP adapters with factory pattern, timeout support, injectable fetch for tests, and redaction-safe errors.
+- **mcp** — MCP server type definitions, registry, permission checks, unsupported-transport errors, and stdio JSON-RPC invocation.
+- **plugin-sdk** — Plugin manifests, registry, loader, executor, and host API for trusted first-party plugins.
 - **security** — Permission engine (deny-by-default), secrets redaction, allowlisted command registry.
 - **observability** — Structured event recording for runs, milestones, commands, and readiness gates.
 - **agent-runtime** — Allowlisted shell command registry with execution wrapper and timeout enforcement.
@@ -205,15 +181,13 @@ The Machine is implemented as a TypeScript monorepo managed by pnpm workspaces w
 
 ### Infrastructure
 
-- **tools/** — Preflight, security check, readiness validation, release build scripts.
-- **tests/** — 375 tests across 22 files (unit, integration, E2E with Playwright).
-- **release/** — Bundled artifacts: machine.js (19.4KB CLI), desktop.js (17.7KB GUI).
-- **scripts/** — Shell verification scripts (verify.sh, production-readiness-check.sh).
+- **tools/** — DB setup/migrate/rollback/scaffold tools, security check, smoke test, readiness validation, and ESM release build scripts.
+- **tests/** — Unit, integration, and E2E tests with local provider/MCP fixtures and temp SQLite coverage.
+- **release/** — Generated release artifacts from `pnpm run build:release`.
+- **scripts/** — POSIX validation scripts plus Windows-native `.cmd` wrappers for preflight, verify, smoke, and production readiness.
 
-### Known Gaps (PR Remediation Sprint)
+### Known Gaps
 
-- **H-1**: plugin-sdk is a 4-line stub — needs full loader, registration, and lifecycle.
-- **H-2**: Concurrency state machine not yet implemented (planned: mutex-based agent execution coordination with IDLE→ACQUIRING→ACQUIRED→RELEASING state machine, configurable max-concurrency cap, FIFO work queue, deadlock timeout).
-- **H-3**: This architecture document now reflects current state (resolved).
-- **M-section**: Desktop app lacks Tauri/Electron config (CLI-only for v0.1.0).
-- **M-section**: Readiness checker evaluates 3 of 12 subsystems.
+- Third-party plugin execution is not a true sandbox; plugin support must remain trusted-first-party or receive a later isolation implementation before production enablement.
+- Live provider credentials and live MCP servers are operator configuration, not part of automated tests.
+- Database migrations are forward-only; rollback tooling guards destructive intent and does not perform down migrations.

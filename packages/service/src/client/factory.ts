@@ -13,6 +13,7 @@ import { createMCPHandler } from "../handlers/mcpHandler.js";
 import { createPluginHandler } from "../handlers/pluginHandler.js";
 import { createReadinessHandler } from "../handlers/readinessHandler.js";
 import { createServiceClient } from "./ServiceClient.js";
+import { ServiceStore } from "../persistence/store.js";
 import type { ServiceClient } from "./ServiceClient.js";
 import type {
   HealthHandler,
@@ -42,6 +43,8 @@ export interface ClientFactoryOptions {
   mcp?: MCPHandler;
   plugin?: PluginHandler;
   readiness?: ReadinessHandler;
+  store?: ServiceStore;
+  dbPath?: string;
 }
 
 /**
@@ -51,14 +54,15 @@ export interface ClientFactoryOptions {
 export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceClient {
   const platform = opts.platform ?? PLATFORM_NAME;
   const version = opts.version ?? "0.1.0";
+  const store = opts.store ?? new ServiceStore(opts.dbPath);
 
   return createServiceClient({
     health: opts.health ?? createHealthHandler(platform, version, START_TIME),
     workspace: opts.workspace ?? createWorkspaceHandler(),
     repo: opts.repo ?? createRepoHandler(),
-    plan: opts.plan ?? createPlanHandler(),
-    run: opts.run ?? createRunHandler(),
-    validation: opts.validation ?? createValidationHandler(),
+    plan: opts.plan ?? createPlanHandler(store),
+    run: opts.run ?? createRunHandler(store),
+    validation: opts.validation ?? createValidationHandler(store),
     provider: opts.provider ?? createProviderHandler(),
     mcp: opts.mcp ?? createMCPHandler(),
     plugin: opts.plugin ?? createPluginHandler(),

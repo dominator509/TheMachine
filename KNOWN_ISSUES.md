@@ -20,6 +20,16 @@ Each entry:
 
 ## Active Issues
 
+### KI-011 — MEDIUM
+
+- **Component**: plugin-sdk (packages/plugin-sdk/)
+- **Source**: audit
+- **Description**: Plugin execution is not a true sandbox. The current executor provides interface-level isolation for trusted first-party plugins, but third-party plugin execution is not isolated strongly enough for production enablement.
+- **Evidence**: `FUNCTIONALITY_AUDIT_BRIEFING.md` FA-009; `packages/plugin-sdk/src/executor.ts` documents that true sandboxing requires additional infrastructure.
+- **Status**: open
+- **Proposed Fix**: Either scope plugin support to trusted first-party plugins in release readiness, or implement a true isolation boundary before enabling third-party plugins.
+- **Resolution**: Pending.
+
 ### KI-001 — HIGH
 
 - **Component**: plugin-sdk (packages/plugin-sdk/)

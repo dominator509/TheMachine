@@ -11,6 +11,34 @@ const DIR = fileURLToPath(new URL(".", import.meta.url));
 const CLI = `node ${resolve(DIR, "../../apps/cli/dist/index.js")}`;
 const ROOT = resolve(DIR, "../..");
 const PLAN_FILE = `${ROOT}/.agent/execplans/EP-004-api-or-service-layer.md`;
+const REQUIRED_ARTIFACTS = [
+  {
+    path: resolve(ROOT, "apps/cli/dist/index.js"),
+    fix: "Run `pnpm run build` before smoke tests.",
+  },
+  {
+    path: resolve(ROOT, "packages/service/dist/index.js"),
+    fix: "Run `pnpm run build` before smoke tests.",
+  },
+  {
+    path: resolve(ROOT, "release/machine.js"),
+    fix: "Run `pnpm run build:release` before smoke tests.",
+  },
+  {
+    path: resolve(ROOT, "release/desktop.js"),
+    fix: "Run `pnpm run build:release` before smoke tests.",
+  },
+];
+
+const missingArtifacts = REQUIRED_ARTIFACTS.filter((artifact) => !existsSync(artifact.path));
+if (missingArtifacts.length > 0) {
+  console.error("Smoke test prerequisites are missing:");
+  for (const artifact of missingArtifacts) {
+    console.error(`  - ${artifact.path}`);
+    console.error(`    ${artifact.fix}`);
+  }
+  process.exit(1);
+}
 
 /** @type {Array<{name:string, cmd?:string, expectOk?:boolean, expectContains?:string[], verify?:()=>void}>} */
 const tests = [
@@ -42,14 +70,14 @@ const tests = [
     cmd: `${CLI} plan ${PLAN_FILE}`,
     expectContains: ["Plan:", "EP-004", "plan: ok"],
   },
-  { name: "plans", cmd: `${CLI} plans`, expectContains: ["No plans loaded"] },
+  { name: "plans", cmd: `${CLI} plans`, expectContains: ["EP-004"] },
   { name: "providers", cmd: `${CLI} providers`, expectContains: ["No providers configured"] },
   { name: "mcp", cmd: `${CLI} mcp`, expectContains: ["No MCP servers"] },
   { name: "plugins", cmd: `${CLI} plugins`, expectContains: ["No plugins registered"] },
   {
     name: "readiness",
     cmd: `${CLI} readiness`,
-    expectContains: ["Overall: ready", "Core:", "Storage:", "Service:"],
+    expectContains: ["Overall: degraded", "Core:", "Storage:", "Service:", "Providers:"],
   },
   {
     name: "readiness filtered",
@@ -88,15 +116,10 @@ const tests = [
       const p = `${ROOT}/release/desktop.js`;
       if (!existsSync(p)) return { ok: false, detail: "file not found" };
       try {
-        new (Function.prototype.bind.apply(Function, [null, readFileSync(p, "utf-8")]))();
+        execSync(`node --check "${p}"`, { encoding: "utf-8", cwd: ROOT, stdio: "pipe" });
         return { ok: true, detail: "parseable" };
-      } catch {
-        try {
-          new Function(readFileSync(p, "utf-8"));
-          return { ok: true, detail: "parseable" };
-        } catch (e) {
-          return { ok: false, detail: `parse error: ${e.message}` };
-        }
+      } catch (e) {
+        return { ok: false, detail: `parse error: ${e.message}` };
       }
     },
   },

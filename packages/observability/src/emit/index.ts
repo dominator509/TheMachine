@@ -6,4 +6,4 @@ export {
   type GuiEventInput,
   type GuiStation,
   type GuiEventType,
-} from "./emitToGUI";
+} from "./emitToGUI.js";
