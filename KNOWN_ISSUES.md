@@ -20,15 +20,7 @@ Each entry:
 
 ## Active Issues
 
-### KI-011 — MEDIUM
-
-- **Component**: plugin-sdk (packages/plugin-sdk/)
-- **Source**: audit
-- **Description**: Plugin execution is not a true sandbox. The current executor provides interface-level isolation for trusted first-party plugins, but third-party plugin execution is not isolated strongly enough for production enablement.
-- **Evidence**: `FUNCTIONALITY_AUDIT_BRIEFING.md` FA-009; `packages/plugin-sdk/src/executor.ts` documents that true sandboxing requires additional infrastructure.
-- **Status**: open
-- **Proposed Fix**: Either scope plugin support to trusted first-party plugins in release readiness, or implement a true isolation boundary before enabling third-party plugins.
-- **Resolution**: Pending.
+No active issues are currently registered from EP-014.
 
 ### KI-001 — HIGH
 
@@ -175,5 +167,13 @@ the AGENTS.md §5.1 protocol.
 
 ## Resolved Issues
 
-<!-- resolved entries move here with resolution details -->
+### KI-011 — MEDIUM
+
+- **Component**: plugin-sdk (packages/plugin-sdk/)
+- **Source**: audit
+- **Description**: Plugin execution lacked a true third-party sandbox. The previous executor provided interface-level isolation for trusted first-party plugins, but third-party plugin execution was not isolated strongly enough for production enablement.
+- **Evidence**: `FUNCTIONALITY_AUDIT_BRIEFING.md` FA-009; pre-EP-014 `packages/plugin-sdk/src/executor.ts` documented that true sandboxing required additional infrastructure.
+- **Status**: resolved
+- **Proposed Fix**: Implement a true isolation boundary before enabling third-party plugins.
+- **Resolution**: EP-014 added subprocess sandbox execution with Node permission restrictions, plugin-directory scoped reads, denied writes by default, scrubbed environment, timeout handling, and focused unit coverage in `tests/unit/plugin-sdk.unit.test.ts`.
 

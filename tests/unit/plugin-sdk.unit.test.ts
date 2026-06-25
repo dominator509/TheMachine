@@ -1,5 +1,9 @@
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
+  createSandboxedExecutor,
   createPluginRegistry,
   registerPlugin,
   unregisterPlugin,
@@ -20,6 +24,33 @@ const SAMPLE_MANIFEST: PluginManifest = {
   entryPoint: "index.js",
   permissions: [{ resource: "log", actions: ["read"], allowed: true }],
 };
+
+function withTempPlugin(files: Record<string, string>): string {
+  const dir = mkdtempSync(join(tmpdir(), "machine-plugin-sandbox-"));
+  for (const [name, content] of Object.entries(files)) {
+    writeFileSync(join(dir, name), content, "utf8");
+  }
+  return dir;
+}
+
+function sandboxInstance(entryPoint: string) {
+  return {
+    manifest: {
+      ...SAMPLE_MANIFEST,
+      entryPoint,
+    },
+    hooks: {},
+    enabled: true,
+  };
+}
+
+function sandboxContext(pluginDir: string) {
+  return {
+    pluginId: String(SAMPLE_MANIFEST.id),
+    pluginDir,
+    config: {},
+  };
+}
 
 // ── Registry ────────────────────────────────────────────────────────────
 
@@ -246,5 +277,134 @@ describe("invokePluginHook", () => {
     const result = invokePluginHook(reg, "onLoad", ctx);
     expect(result.success).toBe(false);
     expect(result.error).toContain("Hook crashed");
+  });
+});
+
+// ── Subprocess Sandbox ──────────────────────────────────────────────────
+
+describe("createSandboxedExecutor", () => {
+  it("executes a third-party hook in a subprocess sandbox", async () => {
+    const dir = withTempPlugin({
+      "plugin.mjs": `
+        export function onExecute(ctx, input) {
+          return { pluginId: ctx.pluginId, value: input.value };
+        }
+      `,
+    });
+    const executor = createSandboxedExecutor();
+    const result = await executor.executeOnExecute(
+      sandboxInstance(join(dir, "plugin.mjs")),
+      sandboxContext(dir),
+      { value: "ok" },
+    );
+
+    expect(result).toEqual({ success: true, output: { pluginId: "plugin-test", value: "ok" } });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("denies sandboxed reads outside the plugin directory", async () => {
+    const secretDir = mkdtempSync(join(tmpdir(), "machine-plugin-secret-"));
+    const secretPath = join(secretDir, "secret.txt");
+    writeFileSync(secretPath, "do-not-read", "utf8");
+    const dir = withTempPlugin({
+      "plugin.mjs": `
+        import { readFileSync } from "node:fs";
+        export function onExecute(ctx, input) {
+          return readFileSync(input.path, "utf8");
+        }
+      `,
+    });
+    const executor = createSandboxedExecutor();
+    const result = await executor.executeOnExecute(
+      sandboxInstance(join(dir, "plugin.mjs")),
+      sandboxContext(dir),
+      { path: secretPath },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("onExecute failed");
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(secretDir, { recursive: true, force: true });
+  });
+
+  it("denies sandboxed writes by default", async () => {
+    const dir = withTempPlugin({
+      "plugin.mjs": `
+        import { writeFileSync } from "node:fs";
+        export function onExecute() {
+          writeFileSync("created.txt", "blocked");
+          return "wrote";
+        }
+      `,
+    });
+    const executor = createSandboxedExecutor();
+    const result = await executor.executeOnExecute(
+      sandboxInstance(join(dir, "plugin.mjs")),
+      sandboxContext(dir),
+      {},
+    );
+
+    expect(result.success).toBe(false);
+    expect(existsSync(join(dir, "created.txt"))).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("times out long-running sandboxed hooks", async () => {
+    const dir = withTempPlugin({
+      "plugin.mjs": `
+        export async function onExecute() {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          return "late";
+        }
+      `,
+    });
+    const executor = createSandboxedExecutor({ timeoutMs: 50 });
+    const result = await executor.executeOnExecute(
+      sandboxInstance(join(dir, "plugin.mjs")),
+      sandboxContext(dir),
+      {},
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "onExecute timed out after 50ms",
+    });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("captures errors from sandboxed hooks", async () => {
+    const dir = withTempPlugin({
+      "plugin.mjs": `
+        export function onLoad() {
+          throw new Error("sandbox boom");
+        }
+      `,
+    });
+    const executor = createSandboxedExecutor();
+    const result = await executor.executeOnLoad(sandboxInstance(join(dir, "plugin.mjs")), sandboxContext(dir));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("sandbox boom");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("keeps trusted in-process execution available only by explicit policy", async () => {
+    const dir = withTempPlugin({
+      "plugin.mjs": `
+        import { readFileSync } from "node:fs";
+        export function onExecute(ctx) {
+          return readFileSync(new URL("./plugin.mjs", import.meta.url), "utf8").includes("readFileSync");
+        }
+      `,
+    });
+    const executor = createSandboxedExecutor({ isolation: "trusted-in-process" });
+    const result = await executor.executeOnExecute(
+      sandboxInstance(join(dir, "plugin.mjs")),
+      sandboxContext(dir),
+      {},
+    );
+
+    expect(result).toEqual({ success: true, output: true });
+    rmSync(dir, { recursive: true, force: true });
   });
 });

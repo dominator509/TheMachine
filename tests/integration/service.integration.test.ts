@@ -12,12 +12,29 @@ import {
   createProviderHandler,
   createMCPHandler,
   createPluginHandler,
+  createProductionApprovalHandler,
   createReadinessHandler,
   acceptedReleaseDecision,
   ServiceStore,
 } from "@the-machine/service";
 import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
+import type { ProductionApproval } from "@the-machine/service";
 import { createUI } from "@the-machine/ui-components";
+
+function acceptedApproval(workspaceId: EntityId, detail = "Accepted for release."): ProductionApproval {
+  const decision = acceptedReleaseDecision(detail);
+  return {
+    workspaceId,
+    providerConfiguration: decision,
+    mcpConfiguration: decision,
+    pluginSandbox: decision,
+    sharedUIScope: decision,
+    releaseDeployment: decision,
+    approvedBy: "Dominic",
+    approvedAt: "2026-06-24T00:00:00.000Z",
+    detail,
+  };
+}
 
 describe("service handlers integration", () => {
   it("health handler returns ok", () => {
@@ -160,6 +177,20 @@ describe("service handlers integration", () => {
     expect(accepted?.releaseDecision?.status).toBe("accepted");
   });
 
+  it("production approval handler tracks missing and accepted release approval", () => {
+    const handler = createProductionApprovalHandler();
+
+    expect(handler.get().accepted).toBe(false);
+    expect(handler.get().missing).toContain("releaseDeployment");
+
+    const recorded = handler.record(acceptedApproval("ws-1" as EntityId));
+    expect(recorded.accepted).toBe(true);
+    expect(recorded.missing).toEqual([]);
+
+    const cleared = handler.clear();
+    expect(cleared.accepted).toBe(false);
+  });
+
   it("readiness handler reports degraded when release decisions are missing", () => {
     const handler = createReadinessHandler();
     const res = handler.check({ workspaceId: "ws-1" as EntityId });
@@ -171,10 +202,11 @@ describe("service handlers integration", () => {
     expect(res.gates.find((gate) => gate.subsystem === "ui-components")?.status).toBe("pending");
   });
 
-  it("readiness handler reports ready when release decisions are accepted", () => {
+  it("readiness handler remains degraded when production approval is partial", () => {
     const provider = createProviderHandler();
     const mcp = createMCPHandler();
     const plugin = createPluginHandler();
+    const approval = createProductionApprovalHandler();
     const decision = acceptedReleaseDecision("Accepted for local release readiness.");
 
     provider.register(
@@ -189,11 +221,64 @@ describe("service handlers integration", () => {
     mcp.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", ["read-file"], decision);
     plugin.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3, decision);
     const ui = createUI({ status: "accepted", detail: "Shared UI registry accepted." });
+    approval.record({
+      ...acceptedApproval("ws-1" as EntityId),
+      releaseDeployment: { status: "pending", detail: "User approval not recorded." },
+    });
 
-    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui });
+    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval });
+    const res = handler.check({ workspaceId: "ws-1" as EntityId });
+
+    expect(res.overall).toBe("degraded");
+    expect(res.gates.find((gate) => gate.subsystem === "service")?.status).toBe("pending");
+  });
+
+  it("readiness handler accepts intentionally unconfigured provider MCP and plugin surfaces", () => {
+    const approval = createProductionApprovalHandler();
+    approval.record(acceptedApproval("ws-1" as EntityId, "Operator accepted local-only release posture."));
+
+    const handler = createReadinessHandler({
+      providers: createProviderHandler(),
+      mcp: createMCPHandler(),
+      plugins: createPluginHandler(),
+      ui: createUI(),
+      approval,
+    });
     const res = handler.check({ workspaceId: "ws-1" as EntityId });
 
     expect(res.overall).toBe("ready");
+    expect(res.gates.find((gate) => gate.subsystem === "providers")?.status).toBe("completed");
+    expect(res.gates.find((gate) => gate.subsystem === "mcp")?.status).toBe("completed");
+    expect(res.gates.find((gate) => gate.subsystem === "plugin-sdk")?.status).toBe("completed");
+    expect(res.gates.find((gate) => gate.subsystem === "ui-components")?.status).toBe("completed");
+  });
+
+  it("readiness handler reports ready when release decisions and production approval are accepted", () => {
+    const provider = createProviderHandler();
+    const mcp = createMCPHandler();
+    const plugin = createPluginHandler();
+    const approval = createProductionApprovalHandler();
+    const decision = acceptedReleaseDecision("Accepted for local release readiness.");
+
+    provider.register(
+      "p-1" as EntityId,
+      "local-llm",
+      "local" as ProviderTier,
+      "http://localhost:8080",
+      ["model-x"],
+      30000,
+      decision,
+    );
+    mcp.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", ["read-file"], decision);
+    plugin.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3, decision);
+    const ui = createUI({ status: "accepted", detail: "Shared UI registry accepted." });
+    approval.record(acceptedApproval("ws-1" as EntityId, "Dominic approved release/deployment."));
+
+    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval });
+    const res = handler.check({ workspaceId: "ws-1" as EntityId });
+
+    expect(res.overall).toBe("ready");
+    expect(res.gates.find((gate) => gate.subsystem === "service")?.status).toBe("completed");
     expect(res.gates.find((gate) => gate.subsystem === "providers")?.status).toBe("completed");
     expect(res.gates.find((gate) => gate.subsystem === "mcp")?.status).toBe("completed");
     expect(res.gates.find((gate) => gate.subsystem === "plugin-sdk")?.status).toBe("completed");

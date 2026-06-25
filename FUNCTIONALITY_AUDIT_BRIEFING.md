@@ -6,7 +6,7 @@ Date: 2026-06-23
 
 The original audit found substantial scaffolded source, tests, and release tooling, but not production readiness. EP-011 has now closed the immediate runtime blockers and replaced the highest-risk fake or placeholder paths with locally verifiable implementations.
 
-Current status: local build, smoke, storage-backed ExecPlan run, provider HTTP adapters with mocked transports, MCP stdio JSON-RPC fixture invocation, DB setup/migration tooling, and readiness checks are implemented and validated. Runtime readiness now derives provider/MCP/plugin/shared-UI gates from local registration state and explicit release decisions. The repository still should not be described as production-launched: real operator configuration, third-party plugin sandboxing decisions, release-channel acceptance, and release approval are still required.
+Current status: local build, smoke, storage-backed ExecPlan run, provider HTTP adapters with mocked transports, MCP stdio JSON-RPC fixture invocation, DB setup/migration tooling, readiness checks, third-party plugin subprocess sandboxing, and production approval gating are implemented and validated locally. The repository still should not be described as deployed, signed, published, or production-launched because no deployment command has been run.
 
 ## Validation Evidence
 
@@ -14,6 +14,7 @@ Current status: local build, smoke, storage-backed ExecPlan run, provider HTTP a
 - `pnpm run test:unit` passed: 350/350 tests.
 - `pnpm run test:integration` passed: 131/131 tests, including temp SQLite DB tools, persisted ExecPlan run, provider HTTP mocks, and MCP stdio fixture coverage.
 - EP-013 added local release-decision readiness coverage: `pnpm run test:unit` passed 354/354 and `pnpm run test:integration` passed 132/132 after provider/MCP/plugin/shared-UI readiness became state-derived.
+- EP-014 added third-party plugin subprocess sandbox coverage and local production approval gating: plugin SDK validation passed 360/360 unit tests through the package-script gate; full integration passed 135/135.
 - `pnpm run build:release` passed and emitted ESM release bundles without the previous `import.meta` CJS warning.
 - `node tools/smoke/smoke-test.mjs` passed: 22/22 checks.
 - `node tools/readiness/production-readiness-check.mjs` passed under Windows direct invocation: 32/32 checks.
@@ -31,7 +32,7 @@ Current status: local build, smoke, storage-backed ExecPlan run, provider HTTP a
 | FA-006 | Closed for stdio | MCP invocation uses stdio JSON-RPC with fixture coverage; unsupported transports return explicit errors. |
 | FA-007 | Closed | DB tools call storage migration APIs and create deterministic migration scaffolds. |
 | FA-008 | Closed | Runtime readiness reports all 12 documented subsystems and provider/MCP/plugin/shared-UI gates are derived from local state plus explicit release decisions. |
-| FA-009 | Open risk | Plugin execution remains trusted first-party/interface isolation only; third-party sandboxing is not enabled. |
+| FA-009 | Closed locally | Third-party plugin hooks can run in a subprocess sandbox with Node permission restrictions, plugin-directory scoped reads, denied writes by default, scrubbed environment, and timeout handling. |
 | FA-010 | Closed | Release bundles are ESM. |
 | FA-011 | Closed | Smoke now fails with targeted prerequisite messages when build/release artifacts are missing. |
 | FA-012 | In progress | Docs are being corrected by EP-011 to remove release-readiness overclaims. |
@@ -232,4 +233,4 @@ Recommended default:
 
 ## Launch Recommendation
 
-Do not treat this repository as production-launched yet. The immediate runtime blockers are closed, and local validation is substantially stronger, but final launch still requires explicit user approval, accepted live-integration configuration, and a decision on whether plugin support remains trusted-first-party or receives a true isolation boundary.
+Do not treat this repository as deployed, signed, published, or externally production-launched yet. The runtime blockers are closed locally, and production approval can now record provider/MCP/shared-UI/plugin-sandbox/release-deployment acceptance, but no deployment command has been run.

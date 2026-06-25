@@ -57,6 +57,7 @@ screenshots/
 !.agent/execplans/EP-011-functionality-remediation.md
 !.agent/execplans/EP-012-full-execplan-code-audit.md
 !.agent/execplans/EP-013-runtime-release-readiness.md
+!.agent/execplans/EP-014-production-readiness-risk-closure.md
 .*_heartbeat
 COMM_BUFFER.md
 

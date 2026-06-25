@@ -13,10 +13,12 @@ import { createValidationHandler } from "../handlers/validationHandler.js";
 import { createProviderHandler } from "../handlers/providerHandler.js";
 import { createMCPHandler } from "../handlers/mcpHandler.js";
 import { createPluginHandler } from "../handlers/pluginHandler.js";
+import { createProductionApprovalHandler } from "../handlers/productionApprovalHandler.js";
 import { createReadinessHandler } from "../handlers/readinessHandler.js";
 import { createServiceClient } from "./ServiceClient.js";
 import { ServiceStore } from "../persistence/store.js";
 import type { ServiceClient } from "./ServiceClient.js";
+import type { ProductionApproval } from "../contracts/productionApproval.js";
 import type {
   HealthHandler,
   WorkspaceHandler,
@@ -27,6 +29,7 @@ import type {
   ProviderHandler,
   MCPHandler,
   PluginHandler,
+  ProductionApprovalHandler,
   ReadinessHandler,
 } from "../handlers/index.js";
 
@@ -44,10 +47,12 @@ export interface ClientFactoryOptions {
   provider?: ProviderHandler;
   mcp?: MCPHandler;
   plugin?: PluginHandler;
+  approval?: ProductionApprovalHandler;
   readiness?: ReadinessHandler;
   ui?: UIRegistry;
   store?: ServiceStore;
   dbPath?: string;
+  productionApproval?: ProductionApproval;
 }
 
 /**
@@ -61,6 +66,7 @@ export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceCli
   const provider = opts.provider ?? createProviderHandler();
   const mcp = opts.mcp ?? createMCPHandler();
   const plugin = opts.plugin ?? createPluginHandler();
+  const approval = opts.approval ?? createProductionApprovalHandler(opts.productionApproval ?? null);
   const ui = opts.ui ?? createUI();
 
   return createServiceClient({
@@ -73,6 +79,9 @@ export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceCli
     provider,
     mcp,
     plugin,
-    readiness: opts.readiness ?? createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui }),
+    approval,
+    readiness:
+      opts.readiness ??
+      createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval }),
   });
 }
