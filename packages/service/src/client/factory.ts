@@ -2,6 +2,8 @@
 // Both CLI and desktop can use this factory to get a fully wired client.
 
 import { PLATFORM_NAME } from "@the-machine/core";
+import { createUI } from "@the-machine/ui-components";
+import type { UIRegistry } from "@the-machine/ui-components";
 import { createHealthHandler } from "../handlers/healthHandler.js";
 import { createWorkspaceHandler } from "../handlers/workspaceHandler.js";
 import { createRepoHandler } from "../handlers/repoHandler.js";
@@ -43,6 +45,7 @@ export interface ClientFactoryOptions {
   mcp?: MCPHandler;
   plugin?: PluginHandler;
   readiness?: ReadinessHandler;
+  ui?: UIRegistry;
   store?: ServiceStore;
   dbPath?: string;
 }
@@ -55,6 +58,10 @@ export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceCli
   const platform = opts.platform ?? PLATFORM_NAME;
   const version = opts.version ?? "0.1.0";
   const store = opts.store ?? new ServiceStore(opts.dbPath);
+  const provider = opts.provider ?? createProviderHandler();
+  const mcp = opts.mcp ?? createMCPHandler();
+  const plugin = opts.plugin ?? createPluginHandler();
+  const ui = opts.ui ?? createUI();
 
   return createServiceClient({
     health: opts.health ?? createHealthHandler(platform, version, START_TIME),
@@ -63,9 +70,9 @@ export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceCli
     plan: opts.plan ?? createPlanHandler(store),
     run: opts.run ?? createRunHandler(store),
     validation: opts.validation ?? createValidationHandler(store),
-    provider: opts.provider ?? createProviderHandler(),
-    mcp: opts.mcp ?? createMCPHandler(),
-    plugin: opts.plugin ?? createPluginHandler(),
-    readiness: opts.readiness ?? createReadinessHandler(),
+    provider,
+    mcp,
+    plugin,
+    readiness: opts.readiness ?? createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui }),
   });
 }

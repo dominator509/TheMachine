@@ -98,6 +98,7 @@ describe("ServiceClient", () => {
         timeoutMs,
         healthy: true,
       }),
+      acceptRelease: () => null,
     };
 
     const mockMCP: MCPHandler = {
@@ -112,6 +113,7 @@ describe("ServiceClient", () => {
         toolCount: tools.length,
         healthy: true,
       }),
+      acceptRelease: () => null,
     };
 
     const mockPlugin: PluginHandler = {
@@ -125,6 +127,7 @@ describe("ServiceClient", () => {
         permissionCount,
         enabled: true,
       }),
+      acceptRelease: () => null,
     };
 
     const mockReadiness: ReadinessHandler = {
@@ -241,6 +244,7 @@ describe("ServiceClient", () => {
           timeoutMs: 5000,
           healthy: true,
         }),
+        acceptRelease: () => null,
       },
       mcp: {
         get: () => null,
@@ -254,6 +258,7 @@ describe("ServiceClient", () => {
           toolCount: 0,
           healthy: true,
         }),
+        acceptRelease: () => null,
       },
       plugin: {
         get: () => null,
@@ -266,6 +271,7 @@ describe("ServiceClient", () => {
           permissionCount: 0,
           enabled: true,
         }),
+        acceptRelease: () => null,
       },
       readiness: { check: () => ({ workspaceId: "", overall: "ready", gates: [] }) },
     });

@@ -49,6 +49,10 @@ export interface KaizenProposal {
 
 // ── KNOWN_ISSUES.md Parser ──────────────────────────────────────────────────
 
+function firstMatch(pattern: RegExp, text: string): RegExpExecArray | null {
+  return pattern.exec(text);
+}
+
 /**
  * Parse a KNOWN_ISSUES.md file into structured KnownIssue entries.
  * Handles the semi-structured markdown format with `### KI-NNN` headers.
@@ -58,23 +62,25 @@ export function parseKnownIssues(markdown: string): KnownIssue[] {
   const blocks = markdown.split(/^### /m).slice(1); // Skip content before first KI header
 
   for (const block of blocks) {
-    const idMatch = block.match(/^(KI-\d+)/m);
+    const idMatch = firstMatch(/^(KI-\d+)/m, block);
     if (!idMatch) continue;
 
     const id = idMatch[1];
     if (!id) continue;
 
-    const compMatch = block.match(/\*\*Component\*\*:\s*(.+)/);
-    const sevMatch = block.match(/\*\*Source\*\*:\s*(.+)/);
-    const descMatch = block.match(/\*\*Description\*\*:\s*(.+)/);
-    const statusMatch = block.match(/\*\*Status\*\*:\s*(\w+)/);
-    const fixMatch = block.match(/\*\*Proposed Fix\*\*:\s*(.+)/);
-    const resMatch = block.match(/\*\*Resolution\*\*:\s*(.+)/);
+    const compMatch = firstMatch(/\*\*Component\*\*:\s*(.+)/, block);
+    const descMatch = firstMatch(/\*\*Description\*\*:\s*(.+)/, block);
+    const statusMatch = firstMatch(/\*\*Status\*\*:\s*(\w+)/, block);
+    const fixMatch = firstMatch(/\*\*Proposed Fix\*\*:\s*(.+)/, block);
+    const resMatch = firstMatch(/\*\*Resolution\*\*:\s*(.+)/, block);
 
     // "Source" is actually "severity" in some older format entries,
     // but the current format uses "Source" for where it came from.
     // Severity is inferred from the header: KI-XXX — SEVERITY
-    const headerSevMatch = block.match(/^KI-\d+\s*[—–-]\s*(CRITICAL|HIGH|MEDIUM|LOW)/m);
+    const headerSevMatch = firstMatch(
+      /^KI-\d+\s*[—–-]\s*(CRITICAL|HIGH|MEDIUM|LOW)/m,
+      block,
+    );
 
     // Determine status — "open" if no resolution or explicit status is "open".
     const rawStatus = (statusMatch?.[1] ?? "").trim().toLowerCase();
@@ -185,15 +191,17 @@ export function generateProposal(
   // Build evidence block.
   const primaryFailure = selected.issues[0]?.description ?? "No description available";
   const driftAnomaly = driftState?.anomalyActive ?? false;
+  const driftDelta = driftState?.driftDelta?.toFixed(4) ?? "N/A";
+  const baselineMean = driftState?.baselineMean.toFixed(4) ?? "N/A";
   const driftNote = driftAnomaly
-    ? `Drift anomaly ACTIVE (delta ${driftState?.driftDelta?.toFixed(4) ?? "N/A"}, baseline ${driftState?.baselineMean.toFixed(4)}). `
+    ? `Drift anomaly ACTIVE (delta ${driftDelta}, baseline ${baselineMean}). `
     : "";
 
   // Generate the proposal XML.
   const now = Date.now();
   const timestamp10min = Math.floor(now / 600_000) * 600_000; // 10-minute bucket
   const random4 = Math.floor(Math.random() * 10000).toString(36).padStart(4, "0");
-  const proposalId = `PROP-${cfg.agentName}-${timestamp10min}-${random4}`;
+  const proposalId = `PROP-${cfg.agentName}-${String(timestamp10min)}-${random4}`;
 
   // Determine change_type based on the issues.
   const allOpen = selected.issues;
@@ -212,7 +220,7 @@ export function generateProposal(
     `  <file>${selected.station}</file>`,
     `  <change>${changeType}</change>`,
     `  <payload>`,
-    `Station ${selected.station} has the highest failure concentration (${(selected.concentrationRatio * 100).toFixed(0)}%, ${selected.openIssueCount} open issues out of ${selected.totalIssueCount} total). ${driftNote}The following issues require immediate resolution:`,
+    `Station ${selected.station} has the highest failure concentration (${(selected.concentrationRatio * 100).toFixed(0)}%, ${String(selected.openIssueCount)} open issues out of ${String(selected.totalIssueCount)} total). ${driftNote}The following issues require immediate resolution:`,
     issueList,
     ``,
     `Proposal ID: ${proposalId}`,
@@ -222,8 +230,8 @@ export function generateProposal(
     `Evidence:`,
     `  - primary_failure: ${primaryFailure}`,
     `  - concentration_ratio: ${selected.concentrationRatio.toFixed(3)}`,
-    `  - open_issues: ${selected.openIssueCount}`,
-    `  - drift_anomaly: ${driftAnomaly}`,
+    `  - open_issues: ${String(selected.openIssueCount)}`,
+    `  - drift_anomaly: ${String(driftAnomaly)}`,
     ``,
     `Expected impact:`,
     `  - risk_level: ${riskLevel}`,

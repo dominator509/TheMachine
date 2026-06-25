@@ -59,7 +59,9 @@ async function postJson(
   extraHeaders: Record<string, string> = {},
 ): Promise<unknown> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30000);
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, opts.timeoutMs ?? 30000);
   try {
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -73,12 +75,12 @@ async function postJson(
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      throw new Error(`HTTP ${String(response.status)}: ${await response.text()}`);
     }
-    return response.json();
+    return await response.json();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(redactError(message));
+    throw new Error(redactError(message), { cause: err });
   } finally {
     clearTimeout(timeout);
   }
@@ -97,7 +99,7 @@ export async function openAIChatCompletion(
     max_tokens: req.maxTokens,
   }, opts)) as OpenAIResponse;
   return {
-    id: data.id ?? `completion-${Date.now()}`,
+    id: data.id ?? `completion-${String(Date.now())}`,
     model: data.model ?? req.model,
     content: data.choices?.[0]?.message?.content ?? "",
     finishReason: finishReason(data.choices?.[0]?.finish_reason),
@@ -128,7 +130,7 @@ export async function anthropicCompletion(
     { "anthropic-version": "2023-06-01" },
   )) as AnthropicResponse;
   return {
-    id: data.id ?? `completion-${Date.now()}`,
+    id: data.id ?? `completion-${String(Date.now())}`,
     model: data.model ?? req.model,
     content: data.content?.find((part) => part.type === "text" || part.text !== undefined)?.text ?? "",
     finishReason: finishReason(data.stop_reason),

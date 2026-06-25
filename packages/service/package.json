@@ -18,7 +18,8 @@
   "dependencies": {
     "@the-machine/core": "workspace:*",
     "@the-machine/observability": "workspace:*",
-    "@the-machine/storage": "workspace:*"
+    "@the-machine/storage": "workspace:*",
+    "@the-machine/ui-components": "workspace:*"
   },
   "scripts": {
     "build": "tsc",

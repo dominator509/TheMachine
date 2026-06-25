@@ -15,4 +15,6 @@ export type {
 export type { ProviderRequest, ProviderResponse, ProviderListResponse } from "./provider.js";
 export type { MCPRequest, MCPResponse, MCPListResponse } from "./mcp.js";
 export type { PluginRequest, PluginResponse, PluginListResponse } from "./plugin.js";
+export type { ReleaseDecision, ReleaseDecisionStatus } from "./releaseDecision.js";
+export { acceptedReleaseDecision } from "./releaseDecision.js";
 export type { ReadinessRequest, ReadinessResponse } from "./readiness.js";

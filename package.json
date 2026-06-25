@@ -19,7 +19,7 @@
     "build": "turbo run build",
     "build:release": "node tools/release/build-release.mjs",
     "security:check": "node tools/security/check-secrets.mjs",
-    "audit": "pnpm audit --audit-level high || true",
+    "audit": "pnpm audit --audit-level high",
     "smoke": "node tools/smoke/smoke-test.mjs",
     "production:readiness": "node tools/readiness/production-readiness-check.mjs",
     "db:setup": "node tools/db/setup.mjs",

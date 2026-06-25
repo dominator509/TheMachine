@@ -104,7 +104,7 @@ export interface EmitConfig {
 // ---------------------------------------------------------------------------
 
 function generateEventId(): string {
-  return `evt-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  return `evt-${String(Date.now())}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 function cleanInput(
@@ -119,13 +119,13 @@ function cleanInput(
     agentId = 0;
   }
 
-  let eventType = String(input.eventType ?? "").toLowerCase();
+  let eventType = (input.eventType ?? "").toLowerCase();
   if (!VALID_EVENT_TYPES.has(eventType)) {
-    errors.push(`Invalid eventType: ${String(input.eventType)}`);
+    errors.push(`Invalid eventType: ${input.eventType ?? ""}`);
     eventType = "progress";
   }
 
-  let station = String(input.station ?? "").toLowerCase();
+  let station = (input.station ?? "").toLowerCase();
   if (!station && agentId > 0) {
     station = DEFAULT_STATION[agentId] ?? "planning";
   }
@@ -135,8 +135,8 @@ function cleanInput(
   }
 
   const agentName = AGENT_NAMES[agentId] ?? "Unknown Agent";
-  const message = String(input.message ?? "").substring(0, 240);
-  const theme = String(input.theme ?? defaultTheme);
+  const message = (input.message ?? "").substring(0, 240);
+  const theme = input.theme ?? defaultTheme;
   const metrics =
     input.metrics &&
     typeof input.metrics === "object" &&
@@ -181,7 +181,9 @@ async function postEvent(
   timeoutMs: number,
 ): Promise<{ ok: boolean; reason: string }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await fetch(webhookUrl, {
@@ -192,7 +194,7 @@ async function postEvent(
     });
 
     if (!response.ok) {
-      return { ok: false, reason: `HTTP ${response.status}` };
+      return { ok: false, reason: `HTTP ${String(response.status)}` };
     }
     return { ok: true, reason: "" };
   } catch (err) {
@@ -253,7 +255,7 @@ export function emitToGUI(
         logFallback(event, errors, webhookUrl, result.reason);
       }
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       logFallback(event, errors, webhookUrl, String(err));
     });
 
@@ -290,7 +292,7 @@ export async function emitToGUIAsync(
     if (!result.ok) {
       logFallback(event, errors, webhookUrl, result.reason);
     }
-    const out: { success: boolean; event: any; reason?: string; validationErrors: string[] } = {
+    const out: { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[] } = {
       success: result.ok,
       event,
       validationErrors: errors,

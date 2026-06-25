@@ -3,6 +3,7 @@ import type {
   ProviderResponse,
   ProviderListResponse,
 } from "../contracts/provider.js";
+import type { ReleaseDecision } from "../contracts/releaseDecision.js";
 import type { EntityId, ProviderTier } from "@the-machine/core";
 
 export interface ProviderHandler {
@@ -15,7 +16,9 @@ export interface ProviderHandler {
     endpoint: string,
     models: string[],
     timeoutMs: number,
+    releaseDecision?: ReleaseDecision,
   ): ProviderResponse;
+  acceptRelease(providerId: EntityId, decision: ReleaseDecision): ProviderResponse | null;
 }
 
 export function createProviderHandler(): ProviderHandler {
@@ -39,6 +42,7 @@ export function createProviderHandler(): ProviderHandler {
       endpoint: string,
       models: string[],
       timeoutMs: number,
+      releaseDecision?: ReleaseDecision,
     ): ProviderResponse {
       const provider: ProviderResponse = {
         id,
@@ -48,9 +52,18 @@ export function createProviderHandler(): ProviderHandler {
         models,
         timeoutMs,
         healthy: true,
+        ...(releaseDecision ? { releaseDecision } : {}),
       };
       providers.set(id, provider);
       return provider;
+    },
+
+    acceptRelease(providerId: EntityId, decision: ReleaseDecision): ProviderResponse | null {
+      const provider = providers.get(providerId);
+      if (!provider) return null;
+      const updated: ProviderResponse = { ...provider, releaseDecision: decision };
+      providers.set(providerId, updated);
+      return updated;
     },
   };
 }

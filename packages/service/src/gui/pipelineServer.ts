@@ -12,7 +12,7 @@ import * as http from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadTheme, listThemes, clearThemeCache, type ThemeManifest } from "./themes/index.js";
+import { loadTheme, listThemes, clearThemeCache } from "./themes/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +83,19 @@ const MIME_TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function parsedEventId(value: unknown): unknown {
+  return objectRecord(value)?.["eventId"];
+}
+
+function themeName(value: unknown): string | null {
+  const name = objectRecord(value)?.["name"];
+  return typeof name === "string" && name.length > 0 ? name : null;
+}
+
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
@@ -93,13 +106,13 @@ function handlePipelineEvent(
   body: string,
 ): void {
   try {
-    const event = JSON.parse(body);
+    const event: unknown = JSON.parse(body);
     // Broadcast to all SSE clients.
     const sseData = `data: ${body}\n\n`;
     broadcastToSseClients(sseData);
 
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, eventId: event.eventId }));
+    res.end(JSON.stringify({ ok: true, eventId: parsedEventId(event) }));
   } catch {
     res.writeHead(400, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: "Invalid JSON" }));
@@ -156,16 +169,17 @@ function handleSaveTheme(
   config: GuiServerConfig,
 ): void {
   try {
-    const theme = JSON.parse(body);
-    if (!theme.name || typeof theme.name !== "string") {
+    const theme: unknown = JSON.parse(body);
+    const name = themeName(theme);
+    if (!name) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "Missing theme name" }));
       return;
     }
     // Sanitize name for filesystem
-    const safeName = theme.name.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
+    const safeName = name.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
     // Resolve the themes source directory
-    const srcDir = path.resolve(__dirname, "../../src/gui/themes");
+    const srcDir = config.themeAssetsDir;
     const distDir = path.resolve(__dirname, "themes");
     const filePath = path.join(srcDir, `${safeName}.json`);
 
@@ -176,7 +190,7 @@ function handleSaveTheme(
     if (fs.existsSync(distDir)) {
       fs.writeFileSync(path.join(distDir, `${safeName}.json`), JSON.stringify(theme, null, 2), "utf-8");
       // Also copy all existing source themes to dist if dist is stale
-      const srcFiles = fs.readdirSync(srcDir).filter(f => f.endsWith(".json"));
+      const srcFiles = fs.readdirSync(srcDir).filter((f) => f.endsWith(".json"));
       for (const f of srcFiles) {
         const dest = path.join(distDir, f);
         if (!fs.existsSync(dest)) {
@@ -190,7 +204,7 @@ function handleSaveTheme(
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, name: safeName }));
-  } catch (err) {
+  } catch {
     res.writeHead(400, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: "Invalid JSON or write error" }));
   }
@@ -255,8 +269,12 @@ function serveStatic(
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = "";
-    req.on("data", (chunk: Buffer) => (data += chunk.toString()));
-    req.on("end", () => resolve(data));
+    req.on("data", (chunk: Buffer) => {
+      data += chunk.toString();
+    });
+    req.on("end", () => {
+      resolve(data);
+    });
     req.on("error", reject);
   });
 }
@@ -324,7 +342,7 @@ export function startGuiServer(config?: Partial<GuiServerConfig>): http.Server {
   const cfg: GuiServerConfig = { ...DEFAULT_CONFIG, ...config };
 
   server = http.createServer((req, res) => {
-    handleRequest(req, res, cfg).catch((err) => {
+    handleRequest(req, res, cfg).catch((err: unknown) => {
       console.error("[pipeline-gui] Unhandled error:", err);
       if (!res.headersSent) {
         res.writeHead(500);
@@ -334,12 +352,16 @@ export function startGuiServer(config?: Partial<GuiServerConfig>): http.Server {
   });
 
   server.listen(cfg.port, cfg.host, () => {
-    console.log(`[pipeline-gui] War Council GUI server running at http://${cfg.host}:${cfg.port}`);
-    console.log(`[pipeline-gui] Dashboard:   http://${cfg.host}:${cfg.port}/`);
-    console.log(`[pipeline-gui] Builder:     http://${cfg.host}:${cfg.port}/builder`);
-    console.log(`[pipeline-gui] SSE stream:  http://${cfg.host}:${cfg.port}/api/pipeline-stream`);
-    console.log(`[pipeline-gui] Themes:      http://${cfg.host}:${cfg.port}/api/themes`);
-    console.log(`[pipeline-gui] Available themes: ${listThemes().map(t => t.name).join(', ')}`);
+    console.log(
+      `[pipeline-gui] War Council GUI server running at http://${cfg.host}:${String(cfg.port)}`,
+    );
+    console.log(`[pipeline-gui] Dashboard:   http://${cfg.host}:${String(cfg.port)}/`);
+    console.log(`[pipeline-gui] Builder:     http://${cfg.host}:${String(cfg.port)}/builder`);
+    console.log(
+      `[pipeline-gui] SSE stream:  http://${cfg.host}:${String(cfg.port)}/api/pipeline-stream`,
+    );
+    console.log(`[pipeline-gui] Themes:      http://${cfg.host}:${String(cfg.port)}/api/themes`);
+    console.log(`[pipeline-gui] Available themes: ${listThemes().map((t) => t.name).join(", ")}`);
   });
 
   return server;
@@ -349,7 +371,11 @@ export function stopGuiServer(): void {
   if (server) {
     // Close all SSE connections.
     for (const client of sseClients) {
-      try { client.res.end(); } catch { /* ignore */ }
+      try {
+        client.res.end();
+      } catch {
+        // ignore closed client
+      }
     }
     sseClients = [];
 

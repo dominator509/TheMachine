@@ -79,13 +79,13 @@ export function loadTheme(themeName: string): ThemeManifest {
 }
 
 /** List all available themes (metadata only, no sprites/assets). */
-export function listThemes(): Array<{
+export function listThemes(): {
   name: string;
   label: string;
   description: string;
   style: string;
   version: string;
-}> {
+}[] {
   const themes = loadAllThemes();
   return [...themes.values()].map((t) => ({
     name: t.name,

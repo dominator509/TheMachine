@@ -131,6 +131,9 @@ importers:
       '@the-machine/storage':
         specifier: workspace:*
         version: link:../storage
+      '@the-machine/ui-components':
+        specifier: workspace:*
+        version: link:../ui-components
 
   packages/storage:
     dependencies:

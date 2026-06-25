@@ -52,7 +52,7 @@ export interface EventBusConfig {
   /** Whether to emit events to stdout as JSON lines (for log aggregation). */
   readonly emitToStdout: boolean;
   /** Optional subscribers registered at creation time. */
-  readonly subscribers?: ReadonlyArray<EventSubscriber>;
+  readonly subscribers?: readonly EventSubscriber[];
 }
 
 // ── Event Bus ───────────────────────────────────────────────────────────────
@@ -62,16 +62,16 @@ export interface EventBus {
   emit(event: Omit<ObsEvent, "id" | "timestamp">): ObsEvent;
 
   /** Return all events in insertion order (newest first). */
-  all(): ReadonlyArray<ObsEvent>;
+  all(): readonly ObsEvent[];
 
   /** Return the most recent N events (newest first). */
-  recent(n: number): ReadonlyArray<ObsEvent>;
+  recent(n: number): readonly ObsEvent[];
 
   /** Return events matching a category filter. */
-  filter(predicate: (e: ObsEvent) => boolean): ReadonlyArray<ObsEvent>;
+  filter(predicate: (e: ObsEvent) => boolean): readonly ObsEvent[];
 
   /** Return only events from the last `windowMs` milliseconds. */
-  inWindow(windowMs: number): ReadonlyArray<ObsEvent>;
+  inWindow(windowMs: number): readonly ObsEvent[];
 
   /** Count events by category. */
   countByCategory(): Map<EventCategory, number>;
@@ -92,7 +92,7 @@ let nextId = 0;
 
 function generateEventId(): string {
   nextId += 1;
-  return `evt_${Date.now()}_${nextId.toString(36)}`;
+  return `evt_${String(Date.now())}_${nextId.toString(36)}`;
 }
 
 export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
@@ -102,7 +102,6 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
   };
 
   const events: ObsEvent[] = [];
-  let sizeInternal = 0;
 
   const bus: EventBus = {
     emit(raw): ObsEvent {
@@ -117,7 +116,6 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
         events.shift();
       }
       events.push(event);
-      sizeInternal = events.length;
 
       if (cfg.emitToStdout) {
         process.stdout.write(JSON.stringify(event) + "\n");
@@ -126,22 +124,22 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
       return event;
     },
 
-    all(): ReadonlyArray<ObsEvent> {
+    all(): readonly ObsEvent[] {
       // Return a frozen copy, newest first.
-      return Object.freeze([...events].reverse()) as ReadonlyArray<ObsEvent>;
+      return Object.freeze([...events].reverse());
     },
 
-    recent(n: number): ReadonlyArray<ObsEvent> {
+    recent(n: number): readonly ObsEvent[] {
       const start = Math.max(0, events.length - Math.min(n, events.length));
       const slice: ObsEvent[] = [];
       for (let i = start; i < events.length; i++) {
         const e = events[i];
         if (e !== undefined) slice.push(e);
       }
-      return Object.freeze(slice.reverse()) as ReadonlyArray<ObsEvent>;
+      return Object.freeze(slice.reverse());
     },
 
-    filter(predicate: (e: ObsEvent) => boolean): ReadonlyArray<ObsEvent> {
+    filter(predicate: (e: ObsEvent) => boolean): readonly ObsEvent[] {
       const results: ObsEvent[] = [];
       for (let i = events.length - 1; i >= 0; i--) {
         const e = events[i];
@@ -149,10 +147,10 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
           results.push(e);
         }
       }
-      return Object.freeze(results) as ReadonlyArray<ObsEvent>;
+      return Object.freeze(results);
     },
 
-    inWindow(windowMs: number): ReadonlyArray<ObsEvent> {
+    inWindow(windowMs: number): readonly ObsEvent[] {
       const cutoff = Date.now() - windowMs;
       return bus.filter((e) => e.timestamp >= cutoff);
     },
@@ -175,7 +173,6 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
 
     clear(): void {
       events.length = 0;
-      sizeInternal = 0;
     },
 
     get size(): number {

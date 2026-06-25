@@ -2,7 +2,7 @@
 // Compares the current 5-step error window against the prior 5-step mean.
 // Triggers circuit breaker when drift delta exceeds 1.5× the rolling baseline.
 
-import type { ObsEvent, EventBus } from "./eventBus.js";
+import type { EventBus } from "./eventBus.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ export interface DriftDetectorState {
   readonly driftDelta: number | null;
   readonly anomalyActive: boolean;
   readonly windowCount: number;
-  readonly snapshotHistory: ReadonlyArray<DriftSnapshot>;
+  readonly snapshotHistory: readonly DriftSnapshot[];
 }
 
 // ── Drift Detector ──────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export interface DriftDetector {
   compute(): DriftSnapshot;
 
   /** Return recent drift history. */
-  history(): ReadonlyArray<DriftSnapshot>;
+  history(): readonly DriftSnapshot[];
 
   /** Inspect detector state without computing. */
   inspect(): DriftDetectorState;
@@ -151,8 +151,8 @@ export function createDriftDetector(
       return snapshot;
     },
 
-    history(): ReadonlyArray<DriftSnapshot> {
-      return Object.freeze([...snapshots]) as ReadonlyArray<DriftSnapshot>;
+    history(): readonly DriftSnapshot[] {
+      return Object.freeze([...snapshots]);
     },
 
     inspect(): DriftDetectorState {
@@ -165,7 +165,7 @@ export function createDriftDetector(
         driftDelta: lastSnapshot?.driftDelta ?? null,
         anomalyActive: lastSnapshot?.anomalous ?? false,
         windowCount: snapshots.length,
-        snapshotHistory: Object.freeze([...snapshots]) as ReadonlyArray<DriftSnapshot>,
+        snapshotHistory: Object.freeze([...snapshots]),
       };
     },
 

@@ -243,7 +243,7 @@ function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
     console.log(`Filtered subsystem: ${subsystem}`);
   }
   for (const gate of result.gates) {
-    const name = gate.subsystem.charAt(0).toUpperCase() + gate.subsystem.slice(1);
+    const name = gate.subsystem.slice(0, 1).toUpperCase() + gate.subsystem.slice(1);
     const status = gate.status === "completed" ? "Ready" : gate.status;
     console.log(`${name}: ${status} (${String(gate.passedChecks)}/${String(gate.totalChecks)})`);
   }
@@ -252,13 +252,14 @@ function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
 function showGui(portArg: string | undefined): void {
   const port = portArg ? parseInt(portArg, 10) : 3000;
   if (isNaN(port) || port < 1 || port > 65535) {
-    console.error(`Invalid port: ${portArg}`);
+    const invalidPort = portArg ?? "";
+    console.error(`Invalid port: ${invalidPort}`);
     process.exit(1);
   }
 
   console.log("Starting War Council GUI server...");
-  console.log(`  Dashboard → http://127.0.0.1:${port}/`);
-  console.log(`  Builder   → http://127.0.0.1:${port}/builder`);
+  console.log(`  Dashboard → http://127.0.0.1:${String(port)}/`);
+  console.log(`  Builder   → http://127.0.0.1:${String(port)}/builder`);
   console.log("Press Ctrl+C to stop.");
 
   startGuiServer({ port, host: "127.0.0.1" });
@@ -282,7 +283,7 @@ function showGuiThemes(jsonMode: boolean): void {
     console.log("No GUI themes found.");
     return;
   }
-  console.log(`${themes.length} theme(s) available:\n`);
+  console.log(`${String(themes.length)} theme(s) available:\n`);
   for (const t of themes) {
     console.log(`  ${t.name} — ${t.label}`);
     console.log(`    ${t.description}`);

@@ -42,7 +42,7 @@ interface ExecPlanRow {
 }
 
 interface MilestoneRow {
-  readonly id: string;
+  readonly id: EntityId;
   readonly validation_command: string | null;
 }
 
@@ -51,7 +51,7 @@ interface CountRow {
 }
 
 function nowId(prefix: string): EntityId {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` as EntityId;
+  return `${prefix}-${String(Date.now())}-${Math.random().toString(36).slice(2, 8)}` as EntityId;
 }
 
 function extractBacktickedValue(value: string): string | null {
@@ -65,12 +65,13 @@ function milestoneStatus(label: string, content: string): ActivityStatus {
 
 export function parseExecPlanMarkdown(filePath: string): ParsedExecPlan {
   const content = existsSync(filePath) ? readFileSync(filePath, "utf-8") : "";
-  const title = /^#\s+(.+)$/m.exec(content)?.[1]?.trim() || "Loaded Plan";
+  const parsedTitle = /^#\s+(.+)$/m.exec(content)?.[1]?.trim();
+  const title = parsedTitle && parsedTitle.length > 0 ? parsedTitle : "Loaded Plan";
   const matches = Array.from(content.matchAll(/^###\s+(M\d+):\s*(.+)$/gm));
   const milestones = matches.map((match, index): ParsedMilestone => {
     const next = matches[index + 1];
-    const section = content.slice(match.index ?? 0, next?.index ?? content.length);
-    const label = match[1] ?? `M${index}`;
+    const section = content.slice(match.index, next?.index ?? content.length);
+    const label = match[1] ?? `M${String(index)}`;
     const goalLine = /^-\s+Goal:\s*(.+)$/m.exec(section);
     const validationLine = /^-\s+Validation command:\s*(.+)$/m.exec(section);
     const expectedLine = /^-\s+Expected result:\s*(.+)$/m.exec(section);
@@ -98,7 +99,7 @@ export function parseExecPlanMarkdown(filePath: string): ParsedExecPlan {
 export class ServiceStore {
   readonly conn: DbConnection;
 
-  constructor(dbPath = process.env["MACHINE_DB_PATH"] || DEFAULT_DB_PATH) {
+  constructor(dbPath = process.env["MACHINE_DB_PATH"] ?? DEFAULT_DB_PATH) {
     mkdirSync(dirname(dbPath), { recursive: true });
     this.conn = createConnection({ path: dbPath });
     migrate(this.conn, ALL_MIGRATIONS);
@@ -151,7 +152,9 @@ export class ServiceStore {
         milestone.recoveryInstruction,
       );
     }
-    return this.getPlan(parsed.id)!;
+    const saved = this.getPlan(parsed.id);
+    if (!saved) throw new Error(`ExecPlan was not saved: ${parsed.id}`);
+    return saved;
   }
 
   getPlan(planId: EntityId): PlanResponse | null {
@@ -191,7 +194,9 @@ export class ServiceStore {
     const rows = this.conn.db
       .prepare("SELECT id FROM execplans ORDER BY updated_at DESC, id ASC")
       .all() as { id: string }[];
-    return rows.map((r) => this.getPlan(r.id as EntityId)).filter((p): p is PlanResponse => p !== null);
+    return rows
+      .map((r) => this.getPlan(r.id as EntityId))
+      .filter((p): p is PlanResponse => p !== null);
   }
 
   startRun(planId: EntityId, requestedMilestoneId?: EntityId): RunResponse {
@@ -204,11 +209,11 @@ export class ServiceStore {
       .run(runId, planId, milestone?.id ?? null);
     if (!milestone?.validation_command) {
       this.markRun(runId, "completed");
-      return this.getRun(runId)!;
+      return this.savedRun(runId);
     }
 
     const started = Date.now();
-    let stdout = "";
+    let stdout: string;
     let stderr = "";
     let exitCode = 0;
     try {
@@ -232,9 +237,9 @@ export class ServiceStore {
       `${stdout}${stderr}`,
       exitCode === 0 ? "info" : "error",
     );
-    this.markMilestone(milestone.id as EntityId, exitCode === 0 ? "completed" : "failed");
+    this.markMilestone(milestone.id, exitCode === 0 ? "completed" : "failed");
     this.markRun(runId, exitCode === 0 ? "completed" : "failed");
-    return this.getRun(runId)!;
+    return this.savedRun(runId);
   }
 
   getRun(runId: EntityId): RunResponse | null {
@@ -325,6 +330,12 @@ export class ServiceStore {
         )
         .get(planId) as MilestoneRow | undefined) ?? null
     );
+  }
+
+  private savedRun(runId: EntityId): RunResponse {
+    const run = this.getRun(runId);
+    if (!run) throw new Error(`Run was not saved: ${runId}`);
+    return run;
   }
 
   private markRun(runId: EntityId, status: ActivityStatus): void {

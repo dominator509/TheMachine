@@ -55,6 +55,8 @@ screenshots/
 !.agent/execplans/
 .agent/execplans/*
 !.agent/execplans/EP-011-functionality-remediation.md
+!.agent/execplans/EP-012-full-execplan-code-audit.md
+!.agent/execplans/EP-013-runtime-release-readiness.md
 .*_heartbeat
 COMM_BUFFER.md
 
