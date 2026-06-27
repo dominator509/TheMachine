@@ -1,4 +1,8 @@
+@C:\Users\domin\.codex\RTK.md
+
 # AGENTS.md
+
+Durable compact repo context lives in `REPO_BRIEF.md`. Read it alongside this file before starting repository-wide, Serena, Obsidian, onboarding, or handoff work.
 
 ## 1. Mission
 
