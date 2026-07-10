@@ -121,7 +121,7 @@ function cleanInput(
 
   let eventType = String(input.eventType ?? "").toLowerCase();
   if (!VALID_EVENT_TYPES.has(eventType)) {
-    errors.push(`Invalid eventType: ${String(input.eventType)}`);
+    errors.push(`Invalid eventType: ${input.eventType ?? "undefined"}`);
     eventType = "progress";
   }
 
@@ -135,8 +135,8 @@ function cleanInput(
   }
 
   const agentName = AGENT_NAMES[agentId] ?? "Unknown Agent";
-  const message = String(input.message ?? "").substring(0, 240);
-  const theme = String(input.theme ?? defaultTheme);
+  const message = (input.message ?? "").substring(0, 240);
+  const theme = input.theme ?? defaultTheme;
   const metrics =
     input.metrics &&
     typeof input.metrics === "object" &&
@@ -181,7 +181,7 @@ async function postEvent(
   timeoutMs: number,
 ): Promise<{ ok: boolean; reason: string }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => { controller.abort(); }, timeoutMs);
 
   try {
     const response = await fetch(webhookUrl, {
@@ -192,10 +192,10 @@ async function postEvent(
     });
 
     if (!response.ok) {
-      return { ok: false, reason: `HTTP ${response.status}` };
+      return { ok: false, reason: `HTTP ${String(response.status)}` };
     }
     return { ok: true, reason: "" };
-  } catch (err) {
+  } catch (err: unknown) {
     const reason =
       err instanceof Error
         ? err.name === "AbortError"
@@ -253,7 +253,7 @@ export function emitToGUI(
         logFallback(event, errors, webhookUrl, result.reason);
       }
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       logFallback(event, errors, webhookUrl, String(err));
     });
 
@@ -290,15 +290,15 @@ export async function emitToGUIAsync(
     if (!result.ok) {
       logFallback(event, errors, webhookUrl, result.reason);
     }
-    const out: { success: boolean; event: any; reason?: string; validationErrors: string[] } = {
+    const out: { success: boolean; event: unknown; reason?: string; validationErrors: string[] } = {
       success: result.ok,
       event,
       validationErrors: errors,
     };
     if (!result.ok) out.reason = result.reason;
-    return out;
-  } catch (err) {
-    const reason = String(err).substring(0, 200);
+    return out as { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[]; };
+  } catch (err: unknown) {
+    const reason = (err instanceof Error ? err.message : String(err)).substring(0, 200);
     logFallback(event, errors, webhookUrl, reason);
     return {
       success: false,

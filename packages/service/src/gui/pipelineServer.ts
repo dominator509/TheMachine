@@ -93,7 +93,8 @@ function handlePipelineEvent(
   body: string,
 ): void {
   try {
-    const event = JSON.parse(body);
+    const event = JSON.parse(body) as { eventId?: string };
+    void event;
     // Broadcast to all SSE clients.
     const sseData = `data: ${body}\n\n`;
     broadcastToSseClients(sseData);
@@ -153,10 +154,10 @@ function handleSaveTheme(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   body: string,
-  config: GuiServerConfig,
+  _config: GuiServerConfig,
 ): void {
   try {
-    const theme = JSON.parse(body);
+    const theme = JSON.parse(body) as ThemeManifest;
     if (!theme.name || typeof theme.name !== "string") {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "Missing theme name" }));
@@ -190,7 +191,7 @@ function handleSaveTheme(
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, name: safeName }));
-  } catch (err) {
+  } catch {
     res.writeHead(400, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: "Invalid JSON or write error" }));
   }
@@ -255,8 +256,8 @@ function serveStatic(
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = "";
-    req.on("data", (chunk: Buffer) => (data += chunk.toString()));
-    req.on("end", () => resolve(data));
+    req.on("data", (chunk: Buffer) => { data += chunk.toString(); return; });
+    req.on("end", () => { resolve(data); });
     req.on("error", reject);
   });
 }
@@ -324,21 +325,21 @@ export function startGuiServer(config?: Partial<GuiServerConfig>): http.Server {
   const cfg: GuiServerConfig = { ...DEFAULT_CONFIG, ...config };
 
   server = http.createServer((req, res) => {
-    handleRequest(req, res, cfg).catch((err) => {
+    handleRequest(req, res, cfg).catch((err: unknown) => {
       console.error("[pipeline-gui] Unhandled error:", err);
       if (!res.headersSent) {
-        res.writeHead(500);
+        res.writeHead(500, { "Content-Type": "text/plain" });
         res.end("Internal server error");
       }
     });
   });
 
   server.listen(cfg.port, cfg.host, () => {
-    console.log(`[pipeline-gui] War Council GUI server running at http://${cfg.host}:${cfg.port}`);
-    console.log(`[pipeline-gui] Dashboard:   http://${cfg.host}:${cfg.port}/`);
-    console.log(`[pipeline-gui] Builder:     http://${cfg.host}:${cfg.port}/builder`);
-    console.log(`[pipeline-gui] SSE stream:  http://${cfg.host}:${cfg.port}/api/pipeline-stream`);
-    console.log(`[pipeline-gui] Themes:      http://${cfg.host}:${cfg.port}/api/themes`);
+    console.log(`[pipeline-gui] War Council GUI server running at http://${cfg.host}:${String(cfg.port)}`);
+    console.log(`[pipeline-gui] Dashboard:   http://${cfg.host}:${String(cfg.port)}/`);
+    console.log(`[pipeline-gui] Builder:     http://${cfg.host}:${String(cfg.port)}/builder`);
+    console.log(`[pipeline-gui] SSE stream:  http://${cfg.host}:${String(cfg.port)}/api/pipeline-stream`);
+    console.log(`[pipeline-gui] Themes:      http://${cfg.host}:${String(cfg.port)}/api/themes`);
     console.log(`[pipeline-gui] Available themes: ${listThemes().map(t => t.name).join(', ')}`);
   });
 

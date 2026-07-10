@@ -1,35 +1,36 @@
 #!/usr/bin/env node
 // The Machine — Auto Review Runner
-// Runs typecheck, lint, unit tests, and integration tests in sequence
-// (sequential gate pattern, each gate blocks the next on failure).
-// Prints a summary table with pass/fail/exit-code per gate.
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("../", import.meta.url).pathname;
+const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 
 // Sequential gates — each must pass before the next runs
 const GATES = [
-  { name: "typecheck", cmd: "pnpm typecheck", cwd: ROOT },
-  { name: "lint", cmd: "pnpm lint", cwd: ROOT },
-  { name: "unit tests", cmd: "pnpm test:unit", cwd: ROOT },
-  { name: "integration tests", cmd: "pnpm test:integration", cwd: ROOT },
+  { name: "typecheck", cmd: "pnpm", args: ["typecheck"], cwd: ROOT },
+  { name: "lint", cmd: "pnpm", args: ["lint"], cwd: ROOT },
+  { name: "unit tests", cmd: "pnpm", args: ["test:unit"], cwd: ROOT },
+  { name: "integration tests", cmd: "pnpm", args: ["test:integration"], cwd: ROOT },
 ];
 
 function runGate(gate) {
-  const { name, cmd, cwd } = gate;
+  const { name, cmd, args, cwd } = gate;
   try {
-    const out = execSync(cmd, { stdio: "pipe", cwd, timeout: 300_000 });
-    const stdout = out.stdout.toString().trim();
-    const lastLine = stdout.split("\n").pop() || "";
-    return { name, passed: true, exitCode: 0, summary: lastLine.slice(0, 80) };
+    const out = spawnSync(cmd, args, { cwd, encoding: "utf-8", timeout: 300_000 });
+    const stdout = out.stdout ? out.stdout.trim() : "";
+    const stderr = out.stderr ? out.stderr.trim() : "";
+
+    if (out.status === 0) {
+      const lastLine = stdout.split("\n").pop() || "";
+      return { name, passed: true, exitCode: 0, summary: lastLine.slice(0, 80) };
+    } else {
+      const summary = (stderr || stdout).split("\n").slice(-2).join("; ").slice(0, 80);
+      return { name, passed: false, exitCode: out.status || 1, summary };
+    }
   } catch (e) {
-    const stderr = e.stderr ? e.stderr.toString().trim() : "";
-    const stdout = e.stdout ? e.stdout.toString().trim() : "";
-    const summary = (stderr || stdout).split("\n").slice(-2).join("; ").slice(0, 80);
-    return { name, passed: false, exitCode: e.status || 1, summary };
+    return { name, passed: false, exitCode: 1, summary: e.message.slice(0, 80) };
   }
 }
 
