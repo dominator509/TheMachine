@@ -51,7 +51,13 @@ tmp/
 screenshots/
 
 # Agent heartbeats & runtime files
-.agent/
+.agent/*
+!.agent/execplans/
+.agent/execplans/*
+!.agent/execplans/EP-011-functionality-remediation.md
+!.agent/execplans/EP-012-full-execplan-code-audit.md
+!.agent/execplans/EP-013-runtime-release-readiness.md
+!.agent/execplans/EP-014-production-readiness-risk-closure.md
 .*_heartbeat
 COMM_BUFFER.md
 
@@ -59,4 +65,5 @@ COMM_BUFFER.md
 *.db
 *.sqlite
 *.sqlite3
+.machine/
 .git-credentials

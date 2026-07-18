@@ -7,8 +7,9 @@
 import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("../../", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 function checkSubsystem(name, pkgDir) {
   const pkgPath = join(ROOT, pkgDir, "package.json");

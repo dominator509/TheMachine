@@ -1,5 +1,6 @@
 import type { RunRequest, RunResponse, RunListResponse } from "../contracts/run.js";
 import type { EntityId } from "@the-machine/core";
+import type { ServiceStore } from "../persistence/store.js";
 
 export interface RunHandler {
   start(req: RunRequest): RunResponse;
@@ -7,11 +8,14 @@ export interface RunHandler {
   list(): RunListResponse;
 }
 
-export function createRunHandler(): RunHandler {
+export function createRunHandler(store?: ServiceStore): RunHandler {
   const runs = new Map<string, RunResponse>();
 
   return {
     start(req: RunRequest): RunResponse {
+      if (store) {
+        return store.startRun(req.planId, req.milestoneId);
+      }
       const id = `${req.planId}-${String(Date.now())}` as EntityId;
       const run: RunResponse = {
         id,
@@ -26,10 +30,12 @@ export function createRunHandler(): RunHandler {
     },
 
     get(runId: EntityId): RunResponse | null {
+      if (store) return store.getRun(runId);
       return runs.get(runId) ?? null;
     },
 
     list(): RunListResponse {
+      if (store) return { runs: store.listRuns() };
       return { runs: Array.from(runs.values()) };
     },
   };

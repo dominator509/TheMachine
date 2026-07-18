@@ -1,6 +1,7 @@
 // Provider configuration schemas.
 
 import type { EntityId, ProviderTier } from "@the-machine/core";
+import type { ReleaseDecision } from "./releaseDecision.js";
 
 export interface ProviderRequest {
   readonly workspaceId: EntityId;
@@ -15,6 +16,7 @@ export interface ProviderResponse {
   readonly models: string[];
   readonly timeoutMs: number;
   readonly healthy: boolean;
+  readonly releaseDecision?: ReleaseDecision;
 }
 
 export interface ProviderListResponse {

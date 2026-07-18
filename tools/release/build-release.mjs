@@ -37,14 +37,14 @@ execSync("pnpm run build", { cwd: ROOT, stdio: "inherit" });
 // Step 2: Bundle CLI with esbuild
 console.log("\n[2/3] Bundling CLI...");
 execSync(
-  `npx esbuild apps/cli/src/index.ts --bundle --platform=node --target=node20 --outfile=release/machine.js --external:esbuild --external:better-sqlite3`,
+  `npx esbuild apps/cli/src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=release/machine.js --external:esbuild --external:better-sqlite3`,
   { cwd: ROOT, stdio: "inherit" },
 );
 
 // Step 3: Bundle desktop with esbuild
 console.log("\n[3/3] Bundling desktop...");
 execSync(
-  `npx esbuild apps/desktop/src/index.ts --bundle --platform=node --target=node20 --outfile=release/desktop.js --external:esbuild --external:better-sqlite3`,
+  `npx esbuild apps/desktop/src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=release/desktop.js --external:esbuild --external:better-sqlite3`,
   { cwd: ROOT, stdio: "inherit" },
 );
 

@@ -1,6 +1,7 @@
 // Plugin manifest schemas.
 
 import type { EntityId, SemVer } from "@the-machine/core";
+import type { ReleaseDecision } from "./releaseDecision.js";
 
 export interface PluginRequest {
   readonly workspaceId: EntityId;
@@ -14,6 +15,7 @@ export interface PluginResponse {
   readonly entryPoint: string;
   readonly permissionCount: number;
   readonly enabled: boolean;
+  readonly releaseDecision?: ReleaseDecision;
 }
 
 export interface PluginListResponse {

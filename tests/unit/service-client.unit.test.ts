@@ -10,6 +10,7 @@ import type {
   ProviderHandler,
   MCPHandler,
   PluginHandler,
+  ProductionApprovalHandler,
   ReadinessHandler,
 } from "@the-machine/service";
 
@@ -98,6 +99,7 @@ describe("ServiceClient", () => {
         timeoutMs,
         healthy: true,
       }),
+      acceptRelease: () => null,
     };
 
     const mockMCP: MCPHandler = {
@@ -112,6 +114,7 @@ describe("ServiceClient", () => {
         toolCount: tools.length,
         healthy: true,
       }),
+      acceptRelease: () => null,
     };
 
     const mockPlugin: PluginHandler = {
@@ -125,6 +128,13 @@ describe("ServiceClient", () => {
         permissionCount,
         enabled: true,
       }),
+      acceptRelease: () => null,
+    };
+
+    const mockApproval: ProductionApprovalHandler = {
+      get: () => ({ approval: null, accepted: false, missing: [] }),
+      record: () => ({ approval: null, accepted: true, missing: [] }),
+      clear: () => ({ approval: null, accepted: false, missing: [] }),
     };
 
     const mockReadiness: ReadinessHandler = {
@@ -145,6 +155,7 @@ describe("ServiceClient", () => {
       provider: mockProvider,
       mcp: mockMCP,
       plugin: mockPlugin,
+      approval: mockApproval,
       readiness: mockReadiness,
     });
 
@@ -162,6 +173,7 @@ describe("ServiceClient", () => {
     ).toBe(true);
     expect(client.mcp.register("m-1", "svc", "stdio", "/tmp/sock", ["tool-a"]).toolCount).toBe(1);
     expect(client.plugin.register("pl-1", "plug", "1.0.0", "entry.mjs", 2).enabled).toBe(true);
+    expect(client.approval.get().accepted).toBe(false);
     expect(client.readiness.check({ workspaceId: "ws-1" }).overall).toBe("ready");
   });
 
@@ -241,6 +253,7 @@ describe("ServiceClient", () => {
           timeoutMs: 5000,
           healthy: true,
         }),
+        acceptRelease: () => null,
       },
       mcp: {
         get: () => null,
@@ -254,6 +267,7 @@ describe("ServiceClient", () => {
           toolCount: 0,
           healthy: true,
         }),
+        acceptRelease: () => null,
       },
       plugin: {
         get: () => null,
@@ -266,12 +280,19 @@ describe("ServiceClient", () => {
           permissionCount: 0,
           enabled: true,
         }),
+        acceptRelease: () => null,
+      },
+      approval: {
+        get: () => ({ approval: null, accepted: false, missing: [] }),
+        record: () => ({ approval: null, accepted: true, missing: [] }),
+        clear: () => ({ approval: null, accepted: false, missing: [] }),
       },
       readiness: { check: () => ({ workspaceId: "", overall: "ready", gates: [] }) },
     });
 
     expect(client.health).toBe(mockHealth);
     expect(Object.keys(client).sort()).toEqual([
+      "approval",
       "health",
       "mcp",
       "plan",

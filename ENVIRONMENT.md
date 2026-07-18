@@ -47,6 +47,14 @@ After EP-001:
 pnpm run dev
 ```
 
+On Windows hosts without WSL or Git Bash, use the native wrappers:
+
+```cmd
+scripts\preflight.cmd
+pnpm install
+pnpm run dev
+```
+
 ## Local Database Setup
 
 After EP-003:
@@ -74,8 +82,8 @@ Validate DB path, log path, bind host, provider profile completeness, MCP JSON, 
 
 ## Environment Parity Rules
 
-Dev/test/staging/prod use the same command wrappers. Test uses fake providers. Staging uses packaged artifacts. Production does not require dev dependencies.
+Dev/test/staging/prod use the same command wrappers. POSIX shells use `scripts/*.sh`; Windows hosts without WSL/Git Bash use the matching `scripts/*.cmd` wrappers where provided. Test uses local mock providers/transports. Staging uses packaged artifacts. Production does not require dev dependencies.
 
 ## Troubleshooting
 
-If `pnpm` is missing, enable Corepack. If desktop build fails, verify Rust and WebView2. If provider test fails, re-enter credentials without committing them. If DB is locked, stop duplicate app process.
+If `pnpm` is missing, enable Corepack. If POSIX shell commands fail on Windows because WSL has no distribution installed, use the `.cmd` wrappers. If desktop build fails, verify Rust and WebView2. If provider test fails, re-enter credentials without committing them. If DB is locked, stop duplicate app process.
