@@ -35,14 +35,6 @@ export interface ProviderHealth {
   readonly error?: string;
 }
 
-export type ProviderFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
-
-export interface ProviderAdapterOptions {
-  readonly apiKey?: string;
-  readonly timeoutMs?: number;
-  readonly fetchImpl?: ProviderFetch;
-}
-
 /** Base provider adapter interface. */
 export interface ProviderAdapter {
   readonly id: EntityId;

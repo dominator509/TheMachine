@@ -11,7 +11,6 @@ import type { ValidationHandler } from "../handlers/validationHandler.js";
 import type { ProviderHandler } from "../handlers/providerHandler.js";
 import type { MCPHandler } from "../handlers/mcpHandler.js";
 import type { PluginHandler } from "../handlers/pluginHandler.js";
-import type { ProductionApprovalHandler } from "../handlers/productionApprovalHandler.js";
 import type { ReadinessHandler } from "../handlers/readinessHandler.js";
 
 export interface ServiceClient {
@@ -24,7 +23,6 @@ export interface ServiceClient {
   readonly provider: ProviderHandler;
   readonly mcp: MCPHandler;
   readonly plugin: PluginHandler;
-  readonly approval: ProductionApprovalHandler;
   readonly readiness: ReadinessHandler;
 }
 
@@ -38,7 +36,6 @@ export function createServiceClient(opts: {
   provider: ProviderHandler;
   mcp: MCPHandler;
   plugin: PluginHandler;
-  approval: ProductionApprovalHandler;
   readiness: ReadinessHandler;
 }): ServiceClient {
   return { ...opts };

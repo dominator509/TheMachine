@@ -4,7 +4,6 @@ import type {
   ValidationListResponse,
 } from "../contracts/validation.js";
 import type { EntityId, Severity } from "@the-machine/core";
-import type { ServiceStore } from "../persistence/store.js";
 
 export interface ValidationHandler {
   record(
@@ -17,7 +16,7 @@ export interface ValidationHandler {
   list(runId: EntityId): ValidationListResponse;
 }
 
-export function createValidationHandler(store?: ServiceStore): ValidationHandler {
+export function createValidationHandler(): ValidationHandler {
   const validations = new Map<string, ValidationResponse[]>();
 
   return {
@@ -28,9 +27,6 @@ export function createValidationHandler(store?: ServiceStore): ValidationHandler
       output: string,
       severity: Severity,
     ): ValidationResponse {
-      if (store) {
-        return store.recordValidation(req.runId, req.command, passed, exitCode, output, severity);
-      }
       const result: ValidationResponse = {
         runId: req.runId,
         command: req.command,
@@ -46,7 +42,6 @@ export function createValidationHandler(store?: ServiceStore): ValidationHandler
     },
 
     list(runId: EntityId): ValidationListResponse {
-      if (store) return { validations: store.listValidations(runId) };
       return { validations: validations.get(runId) ?? [] };
     },
   };

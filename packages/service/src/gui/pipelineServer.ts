@@ -12,7 +12,7 @@ import * as http from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadTheme, listThemes, clearThemeCache } from "./themes/index.js";
+import { loadTheme, listThemes, clearThemeCache, type ThemeManifest } from "./themes/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,19 +83,6 @@ const MIME_TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-function objectRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
-}
-
-function parsedEventId(value: unknown): unknown {
-  return objectRecord(value)?.["eventId"];
-}
-
-function themeName(value: unknown): string | null {
-  const name = objectRecord(value)?.["name"];
-  return typeof name === "string" && name.length > 0 ? name : null;
-}
-
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
@@ -113,7 +100,7 @@ function handlePipelineEvent(
     broadcastToSseClients(sseData);
 
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, eventId: parsedEventId(event) }));
+    res.end(JSON.stringify({ ok: true, eventId: event.eventId }));
   } catch {
     res.writeHead(400, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: "Invalid JSON" }));
@@ -177,9 +164,9 @@ function handleSaveTheme(
       return;
     }
     // Sanitize name for filesystem
-    const safeName = name.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
+    const safeName = theme.name.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
     // Resolve the themes source directory
-    const srcDir = config.themeAssetsDir;
+    const srcDir = path.resolve(__dirname, "../../src/gui/themes");
     const distDir = path.resolve(__dirname, "themes");
     const filePath = path.join(srcDir, `${safeName}.json`);
 
@@ -190,7 +177,7 @@ function handleSaveTheme(
     if (fs.existsSync(distDir)) {
       fs.writeFileSync(path.join(distDir, `${safeName}.json`), JSON.stringify(theme, null, 2), "utf-8");
       // Also copy all existing source themes to dist if dist is stale
-      const srcFiles = fs.readdirSync(srcDir).filter((f) => f.endsWith(".json"));
+      const srcFiles = fs.readdirSync(srcDir).filter(f => f.endsWith(".json"));
       for (const f of srcFiles) {
         const dest = path.join(distDir, f);
         if (!fs.existsSync(dest)) {
@@ -363,11 +350,7 @@ export function stopGuiServer(): void {
   if (server) {
     // Close all SSE connections.
     for (const client of sseClients) {
-      try {
-        client.res.end();
-      } catch {
-        // ignore closed client
-      }
+      try { client.res.end(); } catch { /* ignore */ }
     }
     sseClients = [];
 

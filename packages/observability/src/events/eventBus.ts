@@ -92,7 +92,7 @@ let nextId = 0;
 
 function generateEventId(): string {
   nextId += 1;
-  return `evt_${String(Date.now())}_${nextId.toString(36)}`;
+  return `evt_${Date.now()}_${nextId.toString(36)}`;
 }
 
 export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
@@ -117,6 +117,7 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
         events.shift();
       }
       events.push(event);
+
 
       if (cfg.emitToStdout) {
         process.stdout.write(JSON.stringify(event) + "\n");
@@ -174,6 +175,7 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
 
     clear(): void {
       events.length = 0;
+
     },
 
     get size(): number {

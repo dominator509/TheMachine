@@ -1,5 +1,4 @@
 import type { PluginRequest, PluginResponse, PluginListResponse } from "../contracts/plugin.js";
-import type { ReleaseDecision } from "../contracts/releaseDecision.js";
 import type { EntityId, SemVer } from "@the-machine/core";
 
 export interface PluginHandler {
@@ -11,9 +10,7 @@ export interface PluginHandler {
     version: SemVer,
     entryPoint: string,
     permissionCount: number,
-    releaseDecision?: ReleaseDecision,
   ): PluginResponse;
-  acceptRelease(pluginId: EntityId, decision: ReleaseDecision): PluginResponse | null;
 }
 
 export function createPluginHandler(): PluginHandler {
@@ -36,7 +33,6 @@ export function createPluginHandler(): PluginHandler {
       version: SemVer,
       entryPoint: string,
       permissionCount: number,
-      releaseDecision?: ReleaseDecision,
     ): PluginResponse {
       const plugin: PluginResponse = {
         id,
@@ -45,18 +41,9 @@ export function createPluginHandler(): PluginHandler {
         entryPoint,
         permissionCount,
         enabled: true,
-        ...(releaseDecision ? { releaseDecision } : {}),
       };
       plugins.set(id, plugin);
       return plugin;
-    },
-
-    acceptRelease(pluginId: EntityId, decision: ReleaseDecision): PluginResponse | null {
-      const plugin = plugins.get(pluginId);
-      if (!plugin) return null;
-      const updated: PluginResponse = { ...plugin, releaseDecision: decision };
-      plugins.set(pluginId, updated);
-      return updated;
     },
   };
 }

@@ -37,17 +37,6 @@ Default package manager is `pnpm` with Node.js 20 LTS. If EP-000 discovers a dif
 | Git changed files review      | `git diff --name-only`                    |
 | Git status review             | `git status --short`                      |
 
-## Windows Native Equivalents
-
-On Windows hosts without WSL or Git Bash, use these command-equivalent wrappers from the repository root:
-
-| Purpose                    | Windows Command                            |
-| -------------------------- | ------------------------------------------ |
-| Preflight                  | `scripts\preflight.cmd`                    |
-| Smoke test                 | `scripts\smoke-test.cmd`                   |
-| Full verification          | `scripts\verify.cmd`                       |
-| Production readiness check | `scripts\production-readiness-check.cmd`   |
-
 ## Expected Package Scripts After EP-001
 
 ```json
@@ -88,14 +77,6 @@ If pnpm is missing and Corepack exists:
 corepack enable
 corepack prepare pnpm@latest --activate
 ./scripts/preflight.sh
-```
-
-On Windows without a POSIX shell:
-
-```cmd
-corepack enable
-corepack prepare pnpm@latest --activate
-scripts\preflight.cmd
 ```
 
 ## Forbidden Commands

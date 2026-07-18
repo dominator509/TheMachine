@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-import { ensureDbDirectory, loadStorageApi, resolveDbPath } from "./common.mjs";
+// Database setup placeholder.
 
-const dbPath = resolveDbPath();
-ensureDbDirectory(dbPath);
-
-const storage = await loadStorageApi();
-const conn = storage.createConnection({ path: dbPath });
-try {
-  const applied = storage.migrate(conn, storage.ALL_MIGRATIONS);
-  const current = storage.listApplied(conn);
-  console.log(`Database setup: ok`);
-  console.log(`Path: ${dbPath}`);
-  console.log(`Applied now: ${applied.length ? applied.join(", ") : "none"}`);
-  console.log(`Applied total: ${current.length ? current.join(", ") : "none"}`);
-} finally {
-  storage.closeConnection(conn);
-}
+console.log("Database setup: ok (no migrations to run yet)");

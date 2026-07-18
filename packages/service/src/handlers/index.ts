@@ -30,8 +30,5 @@ export type { MCPHandler } from "./mcpHandler.js";
 export { createPluginHandler } from "./pluginHandler.js";
 export type { PluginHandler } from "./pluginHandler.js";
 
-export { createProductionApprovalHandler } from "./productionApprovalHandler.js";
-export type { ProductionApprovalHandler } from "./productionApprovalHandler.js";
-
 export { createReadinessHandler } from "./readinessHandler.js";
 export type { ReadinessHandler } from "./readinessHandler.js";

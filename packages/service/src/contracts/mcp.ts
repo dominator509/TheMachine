@@ -1,7 +1,6 @@
 // MCP server registry schemas.
 
 import type { EntityId } from "@the-machine/core";
-import type { ReleaseDecision } from "./releaseDecision.js";
 
 export interface MCPRequest {
   readonly workspaceId: EntityId;
@@ -16,7 +15,6 @@ export interface MCPResponse {
   readonly tools: string[];
   readonly toolCount: number;
   readonly healthy: boolean;
-  readonly releaseDecision?: ReleaseDecision;
 }
 
 export interface MCPListResponse {

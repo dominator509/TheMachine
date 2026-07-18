@@ -104,7 +104,7 @@ export interface EmitConfig {
 // ---------------------------------------------------------------------------
 
 function generateEventId(): string {
-  return `evt-${String(Date.now())}-${Math.random().toString(36).substring(2, 11)}`;
+  return `evt-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 function cleanInput(
@@ -119,13 +119,13 @@ function cleanInput(
     agentId = 0;
   }
 
-  let eventType = (input.eventType ?? "").toLowerCase();
+  let eventType = String(input.eventType ?? "").toLowerCase();
   if (!VALID_EVENT_TYPES.has(eventType)) {
     errors.push(`Invalid eventType: ${input.eventType ?? "undefined"}`);
     eventType = "progress";
   }
 
-  let station = (input.station ?? "").toLowerCase();
+  let station = String(input.station ?? "").toLowerCase();
   if (!station && agentId > 0) {
     station = DEFAULT_STATION[agentId] ?? "planning";
   }
@@ -290,7 +290,7 @@ export async function emitToGUIAsync(
     if (!result.ok) {
       logFallback(event, errors, webhookUrl, result.reason);
     }
-    const out: { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[] } = {
+    const out: { success: boolean; event: unknown; reason?: string; validationErrors: string[] } = {
       success: result.ok,
       event,
       validationErrors: errors,

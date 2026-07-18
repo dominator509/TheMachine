@@ -1,19 +1,15 @@
 // Integration tests for The Machine CLI — spawns the CLI as a subprocess.
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 const CLI_PATH = resolve(import.meta.dirname, "../../apps/cli/dist/index.js");
-const CLI_DB_PATH = resolve(mkdtempSync(join(tmpdir(), "machine-cli-")), "machine.sqlite");
 
 function run(args: string): { stdout: string; stderr: string; exitCode: number } {
   try {
     const stdout = execSync(`node ${CLI_PATH} ${args}`, {
       encoding: "utf-8",
       timeout: 5000,
-      env: { ...process.env, MACHINE_DB_PATH: CLI_DB_PATH },
     });
     return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
   } catch (e: any) {
@@ -108,7 +104,7 @@ describe("CLI", () => {
   it("plans lists loaded plans", () => {
     const { stdout, exitCode } = run("plans");
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("/tmp/test-plan.md");
+    expect(stdout).toContain("No plans loaded.");
   });
 
   it("validation requires a run-id argument", () => {

@@ -1,8 +1,5 @@
 // Integration tests for security boundary enforcement.
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { createMCPRegistry } from "@the-machine/mcp";
 import {
   createPermissionRegistry,
@@ -13,33 +10,6 @@ import {
 } from "@the-machine/security";
 import { createOpenAIAdapter } from "@the-machine/providers";
 import type { EntityId } from "@the-machine/core";
-import type { ProviderFetch } from "@the-machine/providers";
-
-function createMCPFixture(): string {
-  const dir = mkdtempSync(join(tmpdir(), "machine-sec-mcp-"));
-  const script = join(dir, "fixture.mjs");
-  writeFileSync(
-    script,
-    `let input = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", () => {
-  const req = JSON.parse(input);
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { ok: true } }));
-});`,
-    "utf-8",
-  );
-  return `"${process.execPath}" "${script}"`;
-}
-
-const providerFetch: ProviderFetch = async () =>
-  new Response(
-    JSON.stringify({
-      id: "chatcmpl-sec",
-      model: "gpt-4",
-      choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
-    }),
-  );
 
 describe("secure command registry", () => {
   it("should deny unpermitted commands", async () => {
@@ -76,7 +46,7 @@ describe("secure MCP registry", () => {
       id: "mcp-1" as unknown as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: createMCPFixture(),
+      endpoint: "/tmp/mcp.sock",
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });
@@ -100,7 +70,7 @@ describe("secure MCP registry", () => {
       id: "mcp-1" as unknown as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: createMCPFixture(),
+      endpoint: "/tmp/mcp.sock",
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });
@@ -119,7 +89,6 @@ describe("secure provider wrapper", () => {
       "test-ai",
       "http://localhost:8080",
       "gpt-4",
-      { fetchImpl: providerFetch },
     );
     const secured = secureProviderAdapter(adapter, permissions);
 
@@ -143,7 +112,6 @@ describe("secure provider wrapper", () => {
       "test-ai",
       "http://localhost:8080",
       "gpt-4",
-      { fetchImpl: providerFetch },
     );
     const secured = secureProviderAdapter(adapter, permissions);
 

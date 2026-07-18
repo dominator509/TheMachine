@@ -102,7 +102,7 @@ export function createCircuitBreaker(
           proposalCountSinceTrip = 0;
           tripReason = {
             snapshot: lastSnapshot,
-            message: `Drift anomaly detected: delta ${lastSnapshot.driftDelta?.toFixed(4) ?? "N/A"} exceeds threshold. window=${String(lastSnapshot.windowIndex)}, errorRate=${lastSnapshot.errorRate.toFixed(4)}`,
+            message: `Drift anomaly detected: delta ${lastSnapshot.driftDelta?.toFixed(4) ?? "N/A"} exceeds threshold. window=${lastSnapshot.windowIndex}, errorRate=${lastSnapshot.errorRate.toFixed(4)}`,
             trippedAt: Date.now(),
           };
         }

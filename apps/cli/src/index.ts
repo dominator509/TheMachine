@@ -243,7 +243,7 @@ function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
     console.log(`Filtered subsystem: ${subsystem}`);
   }
   for (const gate of result.gates) {
-    const name = gate.subsystem.slice(0, 1).toUpperCase() + gate.subsystem.slice(1);
+    const name = gate.subsystem.charAt(0).toUpperCase() + gate.subsystem.slice(1);
     const status = gate.status === "completed" ? "Ready" : gate.status;
     console.log(`${name}: ${status} (${String(gate.passedChecks)}/${String(gate.totalChecks)})`);
   }

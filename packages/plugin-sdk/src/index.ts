@@ -4,8 +4,6 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { PluginManifest, EntityId, SemVer } from "@the-machine/core";
-export { createSandboxedExecutor } from "./executor.js";
-export type { PluginExecutor, PluginSandboxIsolation, PluginSandboxPolicy } from "./executor.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
 

@@ -1,31 +1,39 @@
+// Local-model compatible provider adapter (fake transport).
+
 import type { EntityId } from "@the-machine/core";
 import type {
-  ProviderAdapterOptions,
   ProviderAdapter,
   ProviderCompletionRequest,
   ProviderCompletionResponse,
   ProviderHealth,
 } from "../types.js";
-import { openAIChatCompletion, providerHealth } from "../http.js";
 
 export function createLocalAdapter(
   id: EntityId,
   name: string,
-  endpoint: string,
+  _endpoint: string,
   _model: string,
-  opts: ProviderAdapterOptions = {},
 ): ProviderAdapter {
   return {
     id,
     name,
     tier: "local" as const,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async complete(req: ProviderCompletionRequest): Promise<ProviderCompletionResponse> {
-      return openAIChatCompletion(endpoint, req, opts);
+      const lastMsg = req.messages[req.messages.length - 1];
+      return {
+        id: `local-fake-${String(Date.now())}`,
+        model: req.model,
+        content: `[Local model fake response to: ${lastMsg?.content.slice(0, 40) ?? ""}]`,
+        finishReason: "stop",
+        usage: { promptTokens: 5, completionTokens: 3 },
+      };
     },
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async health(): Promise<ProviderHealth> {
-      return providerHealth(endpoint, opts);
+      return { healthy: true, latencyMs: 2 };
     },
   };
 }

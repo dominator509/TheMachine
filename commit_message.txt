@@ -1,7 +1,0 @@
-test: comprehensive elite level testing suite, coverage tools and refactoring
-
-- Upgraded vitest and added proper `@vitest/coverage-v8` tooling.
-- Configured E2E environments using Playwright for system-level validations.
-- Wrote extensive unit and integration tests covering the Plugin SDK, Observability events, Service HTTP Handlers, Storage backups/migrators, and Provider architectures.
-- Refactored multiple subsystems to resolve strict Type-checking and ESLint errors blocking the deployment pipeline (`pnpm typecheck` and `pnpm lint`).
-- Brought all Unit tests up to 363/363 passing, all 128 Integration tests passing, and 19/19 E2E specs passing.

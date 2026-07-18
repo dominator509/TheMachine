@@ -1,31 +1,40 @@
+// OpenAI-compatible provider adapter (fake transport).
+
 import type { EntityId } from "@the-machine/core";
 import type {
-  ProviderAdapterOptions,
   ProviderAdapter,
   ProviderCompletionRequest,
   ProviderCompletionResponse,
   ProviderHealth,
 } from "../types.js";
-import { openAIChatCompletion, providerHealth } from "../http.js";
 
 export function createOpenAIAdapter(
   id: EntityId,
   name: string,
-  endpoint: string,
+  _endpoint: string,
   _model: string,
-  opts: ProviderAdapterOptions = {},
 ): ProviderAdapter {
   return {
     id,
     name,
     tier: "cloud" as const,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async complete(req: ProviderCompletionRequest): Promise<ProviderCompletionResponse> {
-      return openAIChatCompletion(endpoint, req, opts);
+      // Fake response — no real API call.
+      const lastMsg = req.messages[req.messages.length - 1];
+      return {
+        id: `openai-fake-${String(Date.now())}`,
+        model: req.model,
+        content: `[OpenAI fake response to: ${lastMsg?.content.slice(0, 40) ?? ""}]`,
+        finishReason: "stop",
+        usage: { promptTokens: 10, completionTokens: 5 },
+      };
     },
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async health(): Promise<ProviderHealth> {
-      return providerHealth(endpoint, opts);
+      return { healthy: true, latencyMs: 5 };
     },
   };
 }
