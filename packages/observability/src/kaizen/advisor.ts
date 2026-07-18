@@ -68,19 +68,17 @@ export function parseKnownIssues(markdown: string): KnownIssue[] {
     const id = idMatch[1];
     if (!id) continue;
 
-    const compMatch = firstMatch(/\*\*Component\*\*:\s*(.+)/, block);
-    const descMatch = firstMatch(/\*\*Description\*\*:\s*(.+)/, block);
-    const statusMatch = firstMatch(/\*\*Status\*\*:\s*(\w+)/, block);
-    const fixMatch = firstMatch(/\*\*Proposed Fix\*\*:\s*(.+)/, block);
-    const resMatch = firstMatch(/\*\*Resolution\*\*:\s*(.+)/, block);
+    const compMatch = /\*\*Component\*\*:\s*(.+)/.exec(block);
+    /\*\*Source\*\*:\s*(.+)/.exec(block);
+    const descMatch = /\*\*Description\*\*:\s*(.+)/.exec(block);
+    const statusMatch = /\*\*Status\*\*:\s*(\w+)/.exec(block);
+    const fixMatch = /\*\*Proposed Fix\*\*:\s*(.+)/.exec(block);
+    const resMatch = /\*\*Resolution\*\*:\s*(.+)/.exec(block);
 
     // "Source" is actually "severity" in some older format entries,
     // but the current format uses "Source" for where it came from.
     // Severity is inferred from the header: KI-XXX — SEVERITY
-    const headerSevMatch = firstMatch(
-      /^KI-\d+\s*[—–-]\s*(CRITICAL|HIGH|MEDIUM|LOW)/m,
-      block,
-    );
+    const headerSevMatch = /^KI-\d+\s*[—–-]\s*(CRITICAL|HIGH|MEDIUM|LOW)/m.exec(block);
 
     // Determine status — "open" if no resolution or explicit status is "open".
     const rawStatus = (statusMatch?.[1] ?? "").trim().toLowerCase();

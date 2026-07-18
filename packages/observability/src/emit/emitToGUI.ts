@@ -121,7 +121,7 @@ function cleanInput(
 
   let eventType = (input.eventType ?? "").toLowerCase();
   if (!VALID_EVENT_TYPES.has(eventType)) {
-    errors.push(`Invalid eventType: ${input.eventType ?? ""}`);
+    errors.push(`Invalid eventType: ${input.eventType ?? "undefined"}`);
     eventType = "progress";
   }
 
@@ -181,9 +181,7 @@ async function postEvent(
   timeoutMs: number,
 ): Promise<{ ok: boolean; reason: string }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
+  const timer = setTimeout(() => { controller.abort(); }, timeoutMs);
 
   try {
     const response = await fetch(webhookUrl, {
@@ -197,7 +195,7 @@ async function postEvent(
       return { ok: false, reason: `HTTP ${String(response.status)}` };
     }
     return { ok: true, reason: "" };
-  } catch (err) {
+  } catch (err: unknown) {
     const reason =
       err instanceof Error
         ? err.name === "AbortError"
@@ -298,9 +296,9 @@ export async function emitToGUIAsync(
       validationErrors: errors,
     };
     if (!result.ok) out.reason = result.reason;
-    return out;
-  } catch (err) {
-    const reason = String(err).substring(0, 200);
+    return out as { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[]; };
+  } catch (err: unknown) {
+    const reason = (err instanceof Error ? err.message : String(err)).substring(0, 200);
     logFallback(event, errors, webhookUrl, reason);
     return {
       success: false,

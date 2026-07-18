@@ -67,7 +67,7 @@ function showWorkspace(path: string | undefined, jsonMode: boolean): void {
   }
   console.log(`Workspace path: ${ws.path}`);
   console.log(`Status: ${ws.status}`);
-  console.log(`Active plan: ${String(ws.activeExecPlanId ?? "none")}`);
+  console.log(`Active plan: ${ws.activeExecPlanId ?? "none"}`);
 }
 
 function showRepo(path: string | undefined, jsonMode: boolean): void {
@@ -78,8 +78,8 @@ function showRepo(path: string | undefined, jsonMode: boolean): void {
   }
   console.log(`Repository: ${info.rootPath}`);
   console.log(`Package manager: ${info.packageManager}`);
-  console.log(`Has package.json: ${String(info.hasPackageJson)}`);
-  console.log(`Has .git: ${String(info.hasGit)}`);
+  console.log(`Has package.json: ${info.hasPackageJson ? "true" : "false"}`);
+  console.log(`Has .git: ${info.hasGit ? "true" : "false"}`);
   console.log("repo: ok");
 }
 
@@ -158,7 +158,7 @@ function showProvider(id: string, jsonMode: boolean): void {
   console.log(`Name: ${p.name}`);
   console.log(`Tier: ${p.tier}`);
   console.log(`Endpoint: ${p.endpoint}`);
-  console.log(`Healthy: ${String(p.healthy)}`);
+  console.log(`Healthy: ${p.healthy ? "true" : "false"}`);
 }
 
 function showMCP(jsonMode: boolean): void {
@@ -223,7 +223,7 @@ function showPlugin(id: string, jsonMode: boolean): void {
   console.log(`Plugin: ${p.id}`);
   console.log(`Name: ${p.name}`);
   console.log(`Version: ${p.version}`);
-  console.log(`Enabled: ${String(p.enabled)}`);
+  console.log(`Enabled: ${p.enabled ? "true" : "false"}`);
 }
 
 function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
@@ -252,8 +252,7 @@ function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
 function showGui(portArg: string | undefined): void {
   const port = portArg ? parseInt(portArg, 10) : 3000;
   if (isNaN(port) || port < 1 || port > 65535) {
-    const invalidPort = portArg ?? "";
-    console.error(`Invalid port: ${invalidPort}`);
+    console.error(`Invalid port: ${portArg ?? "undefined"}`);
     process.exit(1);
   }
 

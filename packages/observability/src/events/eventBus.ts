@@ -103,6 +103,7 @@ export function createEventBus(config?: Partial<EventBusConfig>): EventBus {
 
   const events: ObsEvent[] = [];
 
+
   const bus: EventBus = {
     emit(raw): ObsEvent {
       const event: ObsEvent = {
