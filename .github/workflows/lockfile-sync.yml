@@ -1,0 +1,53 @@
+name: One-shot lockfile synchronization
+
+on:
+  push:
+    branches:
+      - codex/agentic-runtime-kaizen-v1
+    paths:
+      - package.json
+      - apps/*/package.json
+      - packages/*/package.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: machine-lockfile-sync
+  cancel-in-progress: true
+
+jobs:
+  synchronize:
+    if: github.repository_owner == 'dominator509' && github.actor == 'dominator509'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - name: Regenerate deterministic workspace lockfile
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+
+      - name: Commit lockfile only when changed
+        run: |
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml is already synchronized."
+            exit 0
+          fi
+          git config user.name "The Machine CI"
+          git config user.email "ci@themachine.dev"
+          git add pnpm-lock.yaml
+          git commit -m "chore: synchronize pnpm lockfile"
+          git push origin HEAD:codex/agentic-runtime-kaizen-v1
