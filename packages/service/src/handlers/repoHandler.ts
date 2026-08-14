@@ -24,7 +24,10 @@ function gitValue(rootPath: string, args: readonly string[]): string | null {
 function knownPackageManager(
   value: string | undefined,
 ): RepoResponse["packageManager"] | null {
-  return value === "pnpm" || value === "npm" || value === "yarn" || value === "bun"
+  return value === "pnpm" ||
+    value === "npm" ||
+    value === "yarn" ||
+    value === "bun"
     ? value
     : null;
 }
