@@ -7,7 +7,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: "./tsconfig.base.json",
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -24,5 +24,5 @@ export default tseslint.config(
       "eslint.config.js",
       "prettier.config.cjs",
     ],
-  }
+  },
 );
