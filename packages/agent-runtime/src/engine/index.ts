@@ -7,6 +7,7 @@ export * from "./policy.js";
 export * from "./state.js";
 export * from "./validation.js";
 export * from "./evidence.js";
+export * from "./console.js";
 export * from "./kaizen.js";
 export {
   AgenticRuntime,
