@@ -2,24 +2,36 @@ name: CI — The Machine
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/**"]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: machine-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22.13.1"
 
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate
+      - name: Enable pinned pnpm
+        run: corepack enable && corepack prepare pnpm@11.6.0 --activate
+
+      - name: Show toolchain
+        run: node --version && pnpm --version && git --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -42,11 +54,11 @@ jobs:
       - name: Integration tests
         run: ./scripts/test-integration.sh
 
+      - name: Build all packages and apps
+        run: ./scripts/build.sh
+
       - name: E2E tests
         run: ./scripts/test-e2e.sh
-
-      - name: Build
-        run: ./scripts/build.sh
 
       - name: Security check
         run: ./scripts/security-check.sh
@@ -54,5 +66,11 @@ jobs:
       - name: Dependency audit
         run: ./scripts/dependency-audit.sh
 
+      - name: Build release artifacts
+        run: pnpm run build:release
+
       - name: Smoke test
         run: ./scripts/smoke-test.sh
+
+      - name: Production readiness
+        run: pnpm run production:readiness
