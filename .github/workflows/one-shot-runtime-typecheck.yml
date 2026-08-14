@@ -1,0 +1,126 @@
+name: One-shot runtime strict type repair
+
+on:
+  push:
+    branches:
+      - codex/agentic-runtime-kaizen-v1
+    paths:
+      - .github/workflows/one-shot-runtime-typecheck.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.repository_owner == 'dominator509' && github.actor == 'dominator509'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Repair exact optional-property and status-narrowing defects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          registry = Path("packages/agent-runtime/src/commands/registry.ts")
+          text = registry.read_text(encoding="utf-8")
+          before = '''  return {
+            executable: base.executable,
+            args: [...(base.args ?? []), ...userArgs],
+            cwd: base.cwd,
+            timeoutMs: options.timeoutMs ?? entry.timeoutMs,
+            environment,
+            passEnvironment,
+            maxOutputBytes: options.maxOutputBytes,
+          };'''
+          after = '''  const timeoutMs = options.timeoutMs ?? entry.timeoutMs;
+          return {
+            executable: base.executable,
+            args: [...(base.args ?? []), ...userArgs],
+            cwd: base.cwd,
+            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+            environment,
+            passEnvironment,
+            ...(options.maxOutputBytes !== undefined
+              ? { maxOutputBytes: options.maxOutputBytes }
+              : {}),
+          };'''
+          if before not in text:
+              raise SystemExit("registry.ts expected return block was not found")
+          registry.write_text(text.replace(before, after, 1), encoding="utf-8")
+
+          orchestrator = Path("packages/agent-runtime/src/engine/orchestrator.ts")
+          text = orchestrator.read_text(encoding="utf-8")
+          marker = '''function completedOutcome(manifest: RunManifest): RunOutcome {
+            return {
+              runId: manifest.runId,
+              status: manifest.status,
+              manifest,
+              evidencePath: manifest.evidencePath,
+            };
+          }
+          '''
+          replacement = marker + '''
+          function currentRunStatus(manifest: RunManifest): RunManifest["status"] {
+            return manifest.status;
+          }
+          '''
+          if marker not in text:
+              raise SystemExit("orchestrator completedOutcome marker was not found")
+          text = text.replace(marker, replacement, 1)
+          replacements = [
+              (
+                  '          if (manifest.status === "cancelled") break;',
+                  '          if (currentRunStatus(manifest) === "cancelled") break;',
+              ),
+              (
+                  '          if (manifest.status === "awaiting_approval") return completedOutcome(manifest);',
+                  '          if (currentRunStatus(manifest) === "awaiting_approval") {\n            return completedOutcome(manifest);\n          }',
+              ),
+              (
+                  '        planPolicy: compiled.plan.policy,',
+                  '        ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),',
+              ),
+          ]
+          for before, after in replacements:
+              count = text.count(before)
+              if count == 0:
+                  raise SystemExit(f"orchestrator expected fragment was not found: {before!r}")
+              text = text.replace(before, after)
+          orchestrator.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Format and verify runtime package
+        run: |
+          pnpm exec prettier --write \
+            packages/agent-runtime/src/commands/registry.ts \
+            packages/agent-runtime/src/engine/orchestrator.ts
+          pnpm --filter @the-machine/agent-runtime lint
+          pnpm --filter @the-machine/agent-runtime typecheck
+
+      - name: Commit the bounded repair
+        run: |
+          git config user.name "The Machine CI"
+          git config user.email "ci@themachine.dev"
+          git add \
+            packages/agent-runtime/src/commands/registry.ts \
+            packages/agent-runtime/src/engine/orchestrator.ts
+          git commit -m "fix(runtime): satisfy strict optional and status semantics"
+          git pull --rebase origin codex/agentic-runtime-kaizen-v1
+          git push origin HEAD:codex/agentic-runtime-kaizen-v1
