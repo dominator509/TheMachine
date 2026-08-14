@@ -68,17 +68,17 @@ export function buildWorkerPrompt(input: WorkerInput): string {
     `Attempt: ${String(input.attempt)}`,
     `Workspace: ${input.workspacePath}`,
     "",
-    `## Objective`,
+    "## Objective",
     input.task.objective,
     "",
-    `## Scope`,
+    "## Scope",
     `Allowed paths: ${allowedPaths}`,
     `Denied paths: ${deniedPaths}`,
     "",
-    `## Deterministic validations`,
+    "## Deterministic validations",
     validations,
     "",
-    `## Prior failures`,
+    "## Prior failures",
     priorFailures,
     "",
     "## Operating contract",
@@ -92,15 +92,48 @@ export function buildWorkerPrompt(input: WorkerInput): string {
   ].join("\n");
 }
 
-function replacePlaceholders(value: string, input: WorkerInput, prompt: string, promptFile: string): string {
+function replacePlaceholders(
+  value: string,
+  input: WorkerInput,
+  prompt: string,
+  promptFile: string,
+): string {
   return value
     .replaceAll("{workspace}", input.workspacePath)
+    .replaceAll("{runDirectory}", input.runDirectory)
     .replaceAll("{runId}", input.runId)
     .replaceAll("{planId}", input.planId)
     .replaceAll("{taskId}", input.task.id)
     .replaceAll("{attempt}", String(input.attempt))
     .replaceAll("{promptFile}", promptFile)
     .replaceAll("{prompt}", prompt);
+}
+
+function replaceEnvironmentPlaceholders(
+  environment: Readonly<Record<string, string>>,
+  input: WorkerInput,
+  prompt: string,
+  promptFile: string,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(environment).map(([key, value]) => [
+      key,
+      replacePlaceholders(value, input, prompt, promptFile),
+    ]),
+  );
+}
+
+function workerMessage(
+  level: Extract<WorkerEvent, { type: "worker.message" }>["level"],
+  value: string,
+): WorkerEvent | null {
+  const message = value.trim();
+  if (message.length === 0) return null;
+  return {
+    type: "worker.message",
+    level,
+    message,
+  };
 }
 
 export function createCliWorker(config: CliWorkerConfig): MachineWorker {
@@ -116,7 +149,15 @@ export function createCliWorker(config: CliWorkerConfig): MachineWorker {
         `${input.task.id}.attempt-${String(input.attempt)}.md`,
       );
       writeFileSync(promptFile, prompt, { encoding: "utf-8", mode: 0o600 });
-      const args = config.args.map((arg) => replacePlaceholders(arg, input, prompt, promptFile));
+      const args = config.args.map((arg) =>
+        replacePlaceholders(arg, input, prompt, promptFile),
+      );
+      const environment = replaceEnvironmentPlaceholders(
+        config.environment ?? {},
+        input,
+        prompt,
+        promptFile,
+      );
 
       yield {
         type: "worker.started",
@@ -128,28 +169,18 @@ export function createCliWorker(config: CliWorkerConfig): MachineWorker {
           executable: config.executable,
           args,
           cwd: input.workspacePath,
-          timeoutMs: config.timeoutMs ?? 6 * 60 * 60 * 1_000,
-          environment: config.environment ?? {},
+          timeoutMs: config.timeoutMs ?? 3_600_000,
+          environment,
           passEnvironment: config.passEnvironment ?? [],
           maxOutputBytes: config.maxOutputBytes ?? 8 * 1024 * 1024,
         },
         input.signal,
       );
 
-      if (result.stdout.trim().length > 0) {
-        yield {
-          type: "worker.message",
-          level: "info",
-          message: result.stdout,
-        };
-      }
-      if (result.stderr.trim().length > 0) {
-        yield {
-          type: "worker.message",
-          level: result.exitCode === 0 ? "warning" : "error",
-          message: result.stderr,
-        };
-      }
+      const stdoutEvent = workerMessage("info", result.stdout);
+      if (stdoutEvent) yield stdoutEvent;
+      const stderrEvent = workerMessage(result.exitCode === 0 ? "warning" : "error", result.stderr);
+      if (stderrEvent) yield stderrEvent;
 
       const reason = result.cancelled
         ? "cancelled"
@@ -160,7 +191,11 @@ export function createCliWorker(config: CliWorkerConfig): MachineWorker {
             : `exited with code ${String(result.exitCode)}`;
       yield {
         type: "worker.completed",
-        success: result.exitCode === 0 && !result.cancelled && !result.timedOut && !result.truncated,
+        success:
+          result.exitCode === 0 &&
+          !result.cancelled &&
+          !result.timedOut &&
+          !result.truncated,
         exitCode: result.exitCode,
         summary: `Worker '${config.id}' ${reason}.`,
       };
