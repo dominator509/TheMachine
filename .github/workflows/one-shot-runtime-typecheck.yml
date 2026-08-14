@@ -38,71 +38,56 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
+          def replace_checked(text: str, before: str, after: str, expected: int = 1) -> str:
+              count = text.count(before)
+              if count != expected:
+                  raise SystemExit(
+                      f"Expected {expected} occurrence(s), found {count}: {before!r}"
+                  )
+              return text.replace(before, after)
+
           registry = Path("packages/agent-runtime/src/commands/registry.ts")
           text = registry.read_text(encoding="utf-8")
-          before = '''  return {
-            executable: base.executable,
-            args: [...(base.args ?? []), ...userArgs],
-            cwd: base.cwd,
-            timeoutMs: options.timeoutMs ?? entry.timeoutMs,
-            environment,
-            passEnvironment,
-            maxOutputBytes: options.maxOutputBytes,
-          };'''
-          after = '''  const timeoutMs = options.timeoutMs ?? entry.timeoutMs;
-          return {
-            executable: base.executable,
-            args: [...(base.args ?? []), ...userArgs],
-            cwd: base.cwd,
-            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-            environment,
-            passEnvironment,
-            ...(options.maxOutputBytes !== undefined
-              ? { maxOutputBytes: options.maxOutputBytes }
-              : {}),
-          };'''
-          if before not in text:
-              raise SystemExit("registry.ts expected return block was not found")
-          registry.write_text(text.replace(before, after, 1), encoding="utf-8")
+          text = replace_checked(
+              text,
+              "  return {\n    executable: base.executable,",
+              "  const timeoutMs = options.timeoutMs ?? entry.timeoutMs;\n  return {\n    executable: base.executable,",
+          )
+          text = replace_checked(
+              text,
+              "    timeoutMs: options.timeoutMs ?? entry.timeoutMs,\n",
+              "    ...(timeoutMs !== undefined ? { timeoutMs } : {}),\n",
+          )
+          text = replace_checked(
+              text,
+              "    maxOutputBytes: options.maxOutputBytes,\n",
+              "    ...(options.maxOutputBytes !== undefined\n      ? { maxOutputBytes: options.maxOutputBytes }\n      : {}),\n",
+          )
+          registry.write_text(text, encoding="utf-8")
 
           orchestrator = Path("packages/agent-runtime/src/engine/orchestrator.ts")
           text = orchestrator.read_text(encoding="utf-8")
-          marker = '''function completedOutcome(manifest: RunManifest): RunOutcome {
-            return {
-              runId: manifest.runId,
-              status: manifest.status,
-              manifest,
-              evidencePath: manifest.evidencePath,
-            };
-          }
-          '''
-          replacement = marker + '''
-          function currentRunStatus(manifest: RunManifest): RunManifest["status"] {
-            return manifest.status;
-          }
-          '''
-          if marker not in text:
-              raise SystemExit("orchestrator completedOutcome marker was not found")
-          text = text.replace(marker, replacement, 1)
-          replacements = [
-              (
-                  '          if (manifest.status === "cancelled") break;',
-                  '          if (currentRunStatus(manifest) === "cancelled") break;',
-              ),
-              (
-                  '          if (manifest.status === "awaiting_approval") return completedOutcome(manifest);',
-                  '          if (currentRunStatus(manifest) === "awaiting_approval") {\n            return completedOutcome(manifest);\n          }',
-              ),
-              (
-                  '        planPolicy: compiled.plan.policy,',
-                  '        ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),',
-              ),
-          ]
-          for before, after in replacements:
-              count = text.count(before)
-              if count == 0:
-                  raise SystemExit(f"orchestrator expected fragment was not found: {before!r}")
-              text = text.replace(before, after)
+          text = replace_checked(
+              text,
+              "\nfunction isCompiled(",
+              "\nfunction currentRunStatus(manifest: RunManifest): RunManifest[\"status\"] {\n  return manifest.status;\n}\n\nfunction isCompiled(",
+          )
+          text = replace_checked(
+              text,
+              '          if (manifest.status === "cancelled") break;',
+              '          if (currentRunStatus(manifest) === "cancelled") break;',
+          )
+          text = replace_checked(
+              text,
+              '          if (manifest.status === "awaiting_approval") return completedOutcome(manifest);',
+              '          if (currentRunStatus(manifest) === "awaiting_approval") {\n            return completedOutcome(manifest);\n          }',
+          )
+          text = replace_checked(
+              text,
+              "        planPolicy: compiled.plan.policy,",
+              "        ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),",
+              expected=2,
+          )
           orchestrator.write_text(text, encoding="utf-8")
           PY
 
