@@ -1,6 +1,6 @@
 {
   "name": "@the-machine/desktop",
-  "version": "0.1.0",
+  "version": "0.3.0-alpha.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -11,11 +11,14 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "node scripts/build-frontend.mjs",
+    "dev": "node scripts/dev-server.mjs",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "tauri": "tauri"
+    "native:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
