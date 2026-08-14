@@ -9,16 +9,20 @@ const APP_ROOT = fileURLToPath(new URL("../", import.meta.url));
 const REPOSITORY_ROOT = resolve(APP_ROOT, "../..");
 const DIST = resolve(APP_ROOT, "dist");
 const FRONTEND = resolve(APP_ROOT, "frontend");
+const FRONTEND_TSCONFIG = resolve(APP_ROOT, "tsconfig.frontend.json");
 const TSC = resolve(REPOSITORY_ROOT, "node_modules", "typescript", "bin", "tsc");
 
 if (!existsSync(TSC)) {
   throw new Error(`TypeScript compiler not found at ${TSC}. Run pnpm install first.`);
 }
+if (!existsSync(FRONTEND_TSCONFIG)) {
+  throw new Error(`Desktop frontend TypeScript configuration missing: ${FRONTEND_TSCONFIG}`);
+}
 
 rmSync(DIST, { recursive: true, force: true });
 mkdirSync(DIST, { recursive: true });
 
-const compilation = spawnSync(process.execPath, [TSC, "-p", resolve(APP_ROOT, "tsconfig.json")], {
+const compilation = spawnSync(process.execPath, [TSC, "-p", FRONTEND_TSCONFIG], {
   cwd: REPOSITORY_ROOT,
   encoding: "utf-8",
   shell: false,
