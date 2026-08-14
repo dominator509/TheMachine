@@ -24,7 +24,8 @@ function detectedPackageManager(rootPath: string, manifest: PackageManifest | nu
   if (declared) return declared;
   if (existsSync(join(rootPath, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(rootPath, "yarn.lock"))) return "yarn";
-  if (existsSync(join(rootPath, "bun.lock")) || existsSync(join(rootPath, "bun.lockb"))) return "bun";
+  if (existsSync(join(rootPath, "bun.lock")) || existsSync(join(rootPath, "bun.lockb")))
+    return "bun";
   if (existsSync(join(rootPath, "package-lock.json"))) return "npm";
   return "unknown";
 }
@@ -50,9 +51,9 @@ export function createRepoHandler(): RepoHandler {
       const manifest = readManifest(packagePath);
       const gitRoot = gitValue(rootPath, ["rev-parse", "--show-toplevel"]);
       const branch = gitRoot
-        ? gitValue(rootPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]) ??
+        ? (gitValue(rootPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]) ??
           gitValue(rootPath, ["rev-parse", "--short", "HEAD"]) ??
-          "detached"
+          "detached")
         : "none";
       return {
         workspaceId: req.workspaceId,

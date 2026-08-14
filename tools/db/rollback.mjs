@@ -5,7 +5,9 @@ const dbPath = resolveDbPath();
 const allowRollback = process.env.MACHINE_ALLOW_DB_ROLLBACK === "1";
 
 if (!allowRollback) {
-  console.error("Rollback stopped: set MACHINE_ALLOW_DB_ROLLBACK=1 to acknowledge rollback intent.");
+  console.error(
+    "Rollback stopped: set MACHINE_ALLOW_DB_ROLLBACK=1 to acknowledge rollback intent.",
+  );
   console.error(`Path: ${dbPath}`);
   process.exit(1);
 }

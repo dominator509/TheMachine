@@ -119,7 +119,9 @@ export function buildSafeEnvironment(
   return environment;
 }
 
-function normalizeSpec(spec: SafeProcessSpec): Required<Pick<SafeProcessSpec, "executable" | "cwd">> & {
+function normalizeSpec(spec: SafeProcessSpec): Required<
+  Pick<SafeProcessSpec, "executable" | "cwd">
+> & {
   readonly args: readonly string[];
   readonly timeoutMs: number;
   readonly environment: NodeJS.ProcessEnv;

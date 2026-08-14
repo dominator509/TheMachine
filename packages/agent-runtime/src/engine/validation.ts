@@ -1,8 +1,5 @@
 import { resolveInsideRoot, runSafeProcess } from "../process.js";
-import type {
-  MachineTask,
-  ValidationResult,
-} from "./types.js";
+import type { MachineTask, ValidationResult } from "./types.js";
 
 export async function runTaskValidations(input: {
   readonly task: MachineTask;

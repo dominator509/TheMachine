@@ -219,7 +219,10 @@ async function runHookInSubprocess(
       settled = true;
       clearTimeout(timer);
       if (timedOut) {
-      resolveResult({ success: false, error: `${hookName} timed out after ${String(timeoutMs)}ms` });
+        resolveResult({
+          success: false,
+          error: `${hookName} timed out after ${String(timeoutMs)}ms`,
+        });
         return;
       }
       resolveResult(parseSandboxResult(hookName, stdout, stderr));

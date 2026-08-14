@@ -129,9 +129,7 @@ export class AgenticRuntime {
     const runId = this.idFactory();
     const baseRef = compiled.plan.repository.baseRef ?? "HEAD";
     const worktreeRoot = resolve(
-      options.worktreeRoot ??
-        this.configuredWorktreeRoot ??
-        defaultWorktreeRoot(repositoryPath),
+      options.worktreeRoot ?? this.configuredWorktreeRoot ?? defaultWorktreeRoot(repositoryPath),
     );
     const worktree = createRunWorktree(repositoryPath, runId, baseRef, worktreeRoot);
     const now = this.clock().toISOString();
@@ -208,7 +206,9 @@ export class AgenticRuntime {
     options: RunPlanOptions = {},
   ): Promise<RunOutcome> {
     const root = getRepositoryRoot(repositoryPath);
-    const stateRoot = resolve(options.stateRoot ?? this.configuredStateRoot ?? join(root, ".machine"));
+    const stateRoot = resolve(
+      options.stateRoot ?? this.configuredStateRoot ?? join(root, ".machine"),
+    );
     const store = new RunStateStore(stateRoot, this.clock);
     const manifest = store.loadManifest(runId);
     if (TERMINAL_RUN_STATUSES.has(manifest.status)) return completedOutcome(manifest);
@@ -233,9 +233,7 @@ export class AgenticRuntime {
     }
 
     const worktreeRoot = resolve(
-      options.worktreeRoot ??
-        this.configuredWorktreeRoot ??
-        dirname(manifest.worktreePath),
+      options.worktreeRoot ?? this.configuredWorktreeRoot ?? dirname(manifest.worktreePath),
     );
     const worktree = createRunWorktree(
       manifest.repositoryPath,
@@ -361,7 +359,8 @@ export class AgenticRuntime {
       this.clock,
     );
     const manifest = store.loadManifest(runId);
-    if (!manifest.taskStates[taskId]) throw new Error(`Task '${taskId}' is not part of run '${runId}'.`);
+    if (!manifest.taskStates[taskId])
+      throw new Error(`Task '${taskId}' is not part of run '${runId}'.`);
     const record: ApprovalRecord = {
       runId,
       taskId,
@@ -473,11 +472,13 @@ export class AgenticRuntime {
                 { taskId: task.id, phase: "after" },
               );
             }
-            manifest.failure = attempt?.failure ?? failure(
-              "approval_rejected",
-              `Human approval was rejected for task '${task.id}'.`,
-              false,
-            );
+            manifest.failure =
+              attempt?.failure ??
+              failure(
+                "approval_rejected",
+                `Human approval was rejected for task '${task.id}'.`,
+                false,
+              );
             manifest.status = "stopped";
             state.status = "failed";
             break;
@@ -603,12 +604,10 @@ export class AgenticRuntime {
           manifest,
           state,
           attempt,
-          failure(
-            "worker_unavailable",
-            `Worker '${workerId}' is not registered.`,
-            true,
-            { workerId, taskId: task.id },
-          ),
+          failure("worker_unavailable", `Worker '${workerId}' is not registered.`, true, {
+            workerId,
+            taskId: task.id,
+          }),
         );
         continue;
       }
@@ -776,12 +775,11 @@ export class AgenticRuntime {
     }
     if (!terminalEvent.success) {
       manifest.metrics.workerFailureCount += 1;
-      return failure(
-        "worker_failed",
-        terminalEvent.summary,
-        true,
-        { workerId: worker.id, taskId: task.id, exitCode: terminalEvent.exitCode },
-      );
+      return failure("worker_failed", terminalEvent.summary, true, {
+        workerId: worker.id,
+        taskId: task.id,
+        exitCode: terminalEvent.exitCode,
+      });
     }
     return null;
   }
@@ -975,16 +973,13 @@ export class AgenticRuntime {
   }
 
   private cancellationRequested(store: RunStateStore, manifest: RunManifest): boolean {
-    const requested = manifest.cancellationRequested || store.isCancellationRequested(manifest.runId);
+    const requested =
+      manifest.cancellationRequested || store.isCancellationRequested(manifest.runId);
     if (requested) manifest.cancellationRequested = true;
     return requested;
   }
 
-  private markCancelled(
-    store: RunStateStore,
-    manifest: RunManifest,
-    state?: TaskRunState,
-  ): void {
+  private markCancelled(store: RunStateStore, manifest: RunManifest, state?: TaskRunState): void {
     manifest.status = "cancelled";
     manifest.failure = failure("cancelled", "Run cancelled by operator request.", false);
     if (state) {
@@ -999,15 +994,21 @@ export class AgenticRuntime {
     });
   }
 
-  private async recoverInterruptedTask(
-    store: RunStateStore,
-    manifest: RunManifest,
-  ): Promise<void> {
+  private async recoverInterruptedTask(store: RunStateStore, manifest: RunManifest): Promise<void> {
     const currentTaskId = manifest.currentTaskId;
     if (!currentTaskId) return;
     const state = manifest.taskStates[currentTaskId];
-    if (!state || state.phase === "awaiting_after_approval" || state.phase === "awaiting_before_approval") return;
-    if (state.phase === "working" || state.phase === "validating" || state.phase === "checkpointing") {
+    if (
+      !state ||
+      state.phase === "awaiting_after_approval" ||
+      state.phase === "awaiting_before_approval"
+    )
+      return;
+    if (
+      state.phase === "working" ||
+      state.phase === "validating" ||
+      state.phase === "checkpointing"
+    ) {
       if (existsSync(manifest.worktreePath)) resetWorktree(manifest.worktreePath);
       const attempt = state.attempts.at(-1);
       if (attempt?.status === "running") {
@@ -1065,7 +1066,11 @@ export class AgenticRuntime {
             type: "kaizen.proposal_generated",
             taskId: null,
             workerId: null,
-            payload: { proposalId: proposal.id, status: proposal.status, signal: proposal.signal.key },
+            payload: {
+              proposalId: proposal.id,
+              status: proposal.status,
+              signal: proposal.signal.key,
+            },
           });
         }
       } catch (error) {
@@ -1083,9 +1088,7 @@ export class AgenticRuntime {
     store.saveManifest(manifest);
 
     const keepWorktree =
-      options.keepWorktree ??
-      compiled.plan.policy?.keepWorktree ??
-      this.configuredKeepWorktree;
+      options.keepWorktree ?? compiled.plan.policy?.keepWorktree ?? this.configuredKeepWorktree;
     if (!keepWorktree && manifest.status === "completed" && worktree) {
       removeRunWorktree(worktree);
     }

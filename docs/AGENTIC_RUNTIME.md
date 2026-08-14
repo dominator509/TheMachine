@@ -8,18 +8,18 @@ The Machine is a control plane, not a replacement for every coding agent. A work
 
 ## Trust boundaries
 
-| Boundary | The Machine responsibility |
-| --- | --- |
-| Plan | Parse, normalize, validate, digest, snapshot |
-| Worker | Launch direct executable/argv, constrain environment, capture terminal protocol |
-| Workspace | Create one linked Git worktree and branch per run |
-| Patch | Stage independently, enumerate files, calculate binary diff and size |
-| Policy | Enforce plan/task path intersection and change budgets |
-| Validation | Execute declared deterministic commands after worker completion |
-| Checkpoint | Commit only after validation and final policy re-check |
-| State | Persist manifests, append-only events, approvals, lease, cancellation |
-| Evidence | Redact, bundle, checksum, verify |
-| Improvement | Aggregate failures and propose; never auto-run or auto-merge |
+| Boundary    | The Machine responsibility                                                      |
+| ----------- | ------------------------------------------------------------------------------- |
+| Plan        | Parse, normalize, validate, digest, snapshot                                    |
+| Worker      | Launch direct executable/argv, constrain environment, capture terminal protocol |
+| Workspace   | Create one linked Git worktree and branch per run                               |
+| Patch       | Stage independently, enumerate files, calculate binary diff and size            |
+| Policy      | Enforce plan/task path intersection and change budgets                          |
+| Validation  | Execute declared deterministic commands after worker completion                 |
+| Checkpoint  | Commit only after validation and final policy re-check                          |
+| State       | Persist manifests, append-only events, approvals, lease, cancellation           |
+| Evidence    | Redact, bundle, checksum, verify                                                |
+| Improvement | Aggregate failures and propose; never auto-run or auto-merge                    |
 
 A worker is not trusted to report that a patch is in scope, correct, validated, or complete.
 

@@ -12,10 +12,7 @@
       "id": "demo-worker",
       "kind": "cli",
       "executable": "node",
-      "args": [
-        "{workspace}/examples/workers/demo-worker.mjs",
-        "{workspace}"
-      ],
+      "args": ["{workspace}/examples/workers/demo-worker.mjs", "{workspace}"],
       "timeoutMs": 30000,
       "maxOutputBytes": 1048576
     }
@@ -24,13 +21,8 @@
     "primary": "demo-worker"
   },
   "policy": {
-    "allowedPaths": [
-      "demo-output.txt"
-    ],
-    "deniedPaths": [
-      ".git/**",
-      ".machine/**"
-    ],
+    "allowedPaths": ["demo-output.txt"],
+    "deniedPaths": [".git/**", ".machine/**"],
     "maxChangedFiles": 1,
     "maxPatchBytes": 10000,
     "allowDependencyChanges": false,
@@ -42,9 +34,7 @@
       "id": "prove-agentic-loop",
       "title": "Create and verify a worker artifact",
       "objective": "Create demo-output.txt with the exact deterministic demonstration sentence.",
-      "allowedPaths": [
-        "demo-output.txt"
-      ],
+      "allowedPaths": ["demo-output.txt"],
       "validations": [
         {
           "id": "demo-output-is-correct",

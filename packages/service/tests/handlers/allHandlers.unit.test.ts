@@ -9,7 +9,7 @@ import {
   createProviderHandler,
   createMCPHandler,
   createPluginHandler,
-  createReadinessHandler
+  createReadinessHandler,
 } from "../../src/handlers";
 
 describe("Service Handlers", () => {

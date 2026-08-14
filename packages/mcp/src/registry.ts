@@ -93,7 +93,7 @@ export function createMCPRegistry(): MCPRegistry {
             error:
               typeof response.error === "string"
                 ? response.error
-                : response.error.message ?? "MCP tool error",
+                : (response.error.message ?? "MCP tool error"),
           };
         }
         return {

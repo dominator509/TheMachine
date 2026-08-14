@@ -9,12 +9,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { RunStateStore } from "./state.js";
-import type {
-  MachinePlan,
-  RunFailure,
-  RunManifest,
-  ValidationCommand,
-} from "./types.js";
+import type { MachinePlan, RunFailure, RunManifest, ValidationCommand } from "./types.js";
 
 export type KaizenProposalStatus =
   | "pending_human_review"
@@ -68,7 +63,10 @@ export interface KaizenAnalyzeOptions {
 function atomicWriteJson(filePath: string, value: unknown): void {
   mkdirSync(resolve(filePath, ".."), { recursive: true, mode: 0o700 });
   const temporary = `${filePath}.${String(process.pid)}.${Math.random().toString(36).slice(2)}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf-8", mode: 0o600 });
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
   renameSync(temporary, filePath);
 }
 
@@ -161,11 +159,7 @@ function improvementObjective(signal: KaizenSignal): string {
   ].join(" ");
 }
 
-function draftPlan(
-  id: string,
-  signal: KaizenSignal,
-  sourcePlan: MachinePlan,
-): MachinePlan {
+function draftPlan(id: string, signal: KaizenSignal, sourcePlan: MachinePlan): MachinePlan {
   const validations = uniqueValidations(sourcePlan);
   return {
     version: 1,
@@ -224,7 +218,8 @@ export class KaizenEngine {
   }
 
   proposalPath(id: string): string {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/.test(id)) throw new Error(`Invalid proposal ID: ${id}`);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/.test(id))
+      throw new Error(`Invalid proposal ID: ${id}`);
     return join(this.proposalsDirectory(), `${id}.json`);
   }
 
@@ -237,7 +232,12 @@ export class KaizenEngine {
   list(): KaizenProposal[] {
     return readdirSync(this.proposalsDirectory())
       .filter((name) => name.endsWith(".json"))
-      .map((name) => JSON.parse(readFileSync(join(this.proposalsDirectory(), name), "utf-8")) as KaizenProposal)
+      .map(
+        (name) =>
+          JSON.parse(
+            readFileSync(join(this.proposalsDirectory(), name), "utf-8"),
+          ) as KaizenProposal,
+      )
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 
@@ -329,7 +329,11 @@ export class KaizenEngine {
     return proposal;
   }
 
-  approve(id: string, actor: string, note = "Approved for a bounded improvement experiment."): KaizenProposal {
+  approve(
+    id: string,
+    actor: string,
+    note = "Approved for a bounded improvement experiment.",
+  ): KaizenProposal {
     const proposal = this.get(id);
     if (proposal.status !== "pending_human_review") {
       throw new Error(`Proposal '${id}' is not awaiting human review.`);

@@ -47,8 +47,20 @@ describe("compute", () => {
 
   it("should compute errorRate correctly", () => {
     // 2 errors out of 4 total = 0.5 error rate
-    bus.emit({ category: "error", severity: "error", subsystem: "a", code: "ERR", message: "err1" });
-    bus.emit({ category: "error", severity: "error", subsystem: "b", code: "ERR", message: "err2" });
+    bus.emit({
+      category: "error",
+      severity: "error",
+      subsystem: "a",
+      code: "ERR",
+      message: "err1",
+    });
+    bus.emit({
+      category: "error",
+      severity: "error",
+      subsystem: "b",
+      code: "ERR",
+      message: "err2",
+    });
     bus.emit({ category: "info", severity: "info", subsystem: "c", code: "INF", message: "info1" });
     bus.emit({ category: "info", severity: "info", subsystem: "d", code: "INF", message: "info2" });
     const snap = dd.compute();
@@ -66,25 +78,61 @@ describe("compute", () => {
     expect(snap1.anomalous).toBe(false);
 
     // Second: inject many errors — drift should spike
-    bus.emit({ category: "error", severity: "error", subsystem: "c", code: "ERR", message: "err1" });
-    bus.emit({ category: "error", severity: "error", subsystem: "d", code: "ERR", message: "err2" });
-    bus.emit({ category: "error", severity: "error", subsystem: "e", code: "ERR", message: "err3" });
+    bus.emit({
+      category: "error",
+      severity: "error",
+      subsystem: "c",
+      code: "ERR",
+      message: "err1",
+    });
+    bus.emit({
+      category: "error",
+      severity: "error",
+      subsystem: "d",
+      code: "ERR",
+      message: "err2",
+    });
+    bus.emit({
+      category: "error",
+      severity: "error",
+      subsystem: "e",
+      code: "ERR",
+      message: "err3",
+    });
     const snap2 = dd.compute();
     // 3 errors out of 5 total = 0.6 error rate
-    // Baseline = 0 (snap1 errorRate) → delta = 0.6 > 1.5 × 0 = 0? 
+    // Baseline = 0 (snap1 errorRate) → delta = 0.6 > 1.5 × 0 = 0?
     // Actually baselineMean > 0 check fails here since baseline is 0.
     // Need proper baseline: accumulate multiple windows first.
     expect(snap2.driftDelta).not.toBeNull();
 
     // Fill more windows to build baseline
     for (let i = 0; i < 4; i++) {
-      bus.emit({ category: "info", severity: "info", subsystem: "x", code: "INF", message: `info${i}` });
+      bus.emit({
+        category: "info",
+        severity: "info",
+        subsystem: "x",
+        code: "INF",
+        message: `info${i}`,
+      });
       dd.compute();
     }
 
     // Now inject spiking errors
-    bus.emit({ category: "error", severity: "critical", subsystem: "boom", code: "CRIT", message: "critical" });
-    bus.emit({ category: "error", severity: "critical", subsystem: "boom", code: "CRIT", message: "critical2" });
+    bus.emit({
+      category: "error",
+      severity: "critical",
+      subsystem: "boom",
+      code: "CRIT",
+      message: "critical",
+    });
+    bus.emit({
+      category: "error",
+      severity: "critical",
+      subsystem: "boom",
+      code: "CRIT",
+      message: "critical2",
+    });
     const snapFinal = dd.compute();
     // This should be anomalous if error rate jumps enough
     expect(snapFinal.driftDelta).not.toBeNull();

@@ -1,9 +1,4 @@
-import type {
-  MachineTask,
-  PlanPolicy,
-  PolicyDecision,
-  PolicyViolation,
-} from "./types.js";
+import type { MachineTask, PlanPolicy, PolicyDecision, PolicyViolation } from "./types.js";
 import type { StagedPatch } from "./git.js";
 
 const DEFAULT_DENIED_PATHS = [".git/**", ".machine/**", "node_modules/**"] as const;
@@ -135,7 +130,8 @@ export function evaluatePatchPolicy(input: {
     });
   }
   if (!(planPolicy.allowBinaryChanges ?? false)) {
-    const binaryPatch = input.patch.patch.includes("GIT binary patch") || input.patch.patch.includes("Binary files ");
+    const binaryPatch =
+      input.patch.patch.includes("GIT binary patch") || input.patch.patch.includes("Binary files ");
     if (binaryPatch) {
       violations.push({
         code: "BINARY_CHANGE_DENIED",

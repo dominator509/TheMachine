@@ -38,10 +38,7 @@ function commandSpec(
     ...(entry.environment ?? {}),
     ...(options.environment ?? {}),
   };
-  const passEnvironment = [
-    ...(entry.passEnvironment ?? []),
-    ...(options.passEnvironment ?? []),
-  ];
+  const passEnvironment = [...(entry.passEnvironment ?? []), ...(options.passEnvironment ?? [])];
 
   return {
     executable: base.executable,

@@ -8,9 +8,5 @@ const outputPath = resolve(workspace, "demo-output.txt");
 if (!outputPath.startsWith(`${workspace}/`) && outputPath !== `${workspace}\\demo-output.txt`) {
   throw new Error("Output path escaped the supplied workspace.");
 }
-writeFileSync(
-  outputPath,
-  "The Machine executed a worker in an isolated Git worktree.\n",
-  "utf-8",
-);
+writeFileSync(outputPath, "The Machine executed a worker in an isolated Git worktree.\n", "utf-8");
 console.log(`Created ${outputPath}`);

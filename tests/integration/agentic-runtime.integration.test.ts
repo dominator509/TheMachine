@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -160,9 +154,9 @@ describe("agentic runtime vertical slice", () => {
     expect(task?.attempts[0]?.failure?.category).toBe("policy_violation");
     expect(task?.attempts[1]?.workerId).toBe("good");
     expect(git(repository, ["show", `${outcome.manifest.branch}:result.txt`])).toBe("done");
-    expect(git(repository, ["ls-tree", "-r", "--name-only", outcome.manifest.branch])).not.toContain(
-      "forbidden.txt",
-    );
+    expect(
+      git(repository, ["ls-tree", "-r", "--name-only", outcome.manifest.branch]),
+    ).not.toContain("forbidden.txt");
   });
 
   it("pauses before work and resumes only after an explicit approval", async () => {

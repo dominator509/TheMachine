@@ -98,15 +98,15 @@ Workers are deliberately generic. The Machine does not pretend that a completion
 
 Supported placeholders:
 
-| Placeholder | Value |
-| --- | --- |
-| `{workspace}` | Isolated run worktree |
-| `{prompt}` | Full bounded task prompt as one argv value |
+| Placeholder    | Value                                      |
+| -------------- | ------------------------------------------ |
+| `{workspace}`  | Isolated run worktree                      |
+| `{prompt}`     | Full bounded task prompt as one argv value |
 | `{promptFile}` | Mode-0600 prompt file outside the worktree |
-| `{runId}` | Durable run identifier |
-| `{planId}` | Immutable plan identifier |
-| `{taskId}` | Current task identifier |
-| `{attempt}` | Current retry number |
+| `{runId}`      | Durable run identifier                     |
+| `{planId}`     | Immutable plan identifier                  |
+| `{taskId}`     | Current task identifier                    |
+| `{attempt}`    | Current retry number                       |
 
 The Machine passes only a small safe base environment plus names explicitly listed in `passEnvironment`. Fixed environment values are never displayed by `machine workers`; only their variable names are shown.
 

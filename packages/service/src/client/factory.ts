@@ -66,7 +66,8 @@ export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceCli
   const provider = opts.provider ?? createProviderHandler();
   const mcp = opts.mcp ?? createMCPHandler();
   const plugin = opts.plugin ?? createPluginHandler();
-  const approval = opts.approval ?? createProductionApprovalHandler(opts.productionApproval ?? null);
+  const approval =
+    opts.approval ?? createProductionApprovalHandler(opts.productionApproval ?? null);
   const ui = opts.ui ?? createUI();
 
   return createServiceClient({

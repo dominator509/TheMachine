@@ -27,7 +27,8 @@ setTimeout(async () => {
     const r = await fetch(`${BASE}/api/themes`);
     if (r.status !== 200) throw new Error(`status ${r.status}`);
     const body = await r.json();
-    if (!body.themes || body.themes.length !== 4) throw new Error(`expected 4 themes, got ${body.themes?.length}`);
+    if (!body.themes || body.themes.length !== 4)
+      throw new Error(`expected 4 themes, got ${body.themes?.length}`);
   });
 
   await test("GET /api/theme/fft-chibi returns FFT theme", async () => {
@@ -72,7 +73,13 @@ setTimeout(async () => {
     const r = await fetch(`${BASE}/api/pipeline-event`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId: "test-1", agentId: 5, eventType: "status", station: "coding", payload: {} }),
+      body: JSON.stringify({
+        eventId: "test-1",
+        agentId: 5,
+        eventType: "status",
+        station: "coding",
+        payload: {},
+      }),
     });
     if (r.status !== 200) throw new Error(`status ${r.status}`);
     const body = await r.json();

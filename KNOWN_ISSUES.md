@@ -6,6 +6,7 @@ are registered here. RELEASE.md "Known Issues" sections are derived from this fi
 ## Schema
 
 Each entry:
+
 ```
 ### {issue_id} — {severity}
 
@@ -176,4 +177,3 @@ the AGENTS.md §5.1 protocol.
 - **Status**: resolved
 - **Proposed Fix**: Implement a true isolation boundary before enabling third-party plugins.
 - **Resolution**: EP-014 added subprocess sandbox execution with Node permission restrictions, plugin-directory scoped reads, denied writes by default, scrubbed environment, timeout handling, and focused unit coverage in `tests/unit/plugin-sdk.unit.test.ts`.
-

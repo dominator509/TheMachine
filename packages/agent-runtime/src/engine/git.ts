@@ -37,11 +37,7 @@ export class GitCommandError extends Error {
   }
 }
 
-export function runGit(
-  cwd: string,
-  args: readonly string[],
-  allowFailure = false,
-): GitResult {
+export function runGit(cwd: string, args: readonly string[], allowFailure = false): GitResult {
   const result = spawnSync("git", [...args], {
     cwd: resolve(cwd),
     env: buildSafeEnvironment([], {
@@ -85,11 +81,8 @@ function validRunSegment(runId: string): string {
 
 function branchExists(repositoryPath: string, branch: string): boolean {
   return (
-    runGit(
-      repositoryPath,
-      ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`],
-      true,
-    ).exitCode === 0
+    runGit(repositoryPath, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], true)
+      .exitCode === 0
   );
 }
 
@@ -136,7 +129,13 @@ export function stageAndInspect(worktreePath: string): StagedPatch {
   const changedFiles = parseNullSeparated(
     runGit(worktreePath, ["diff", "--cached", "--name-only", "-z", "HEAD"]).stdout,
   );
-  const patch = runGit(worktreePath, ["diff", "--cached", "--binary", "--no-ext-diff", "HEAD"]).stdout;
+  const patch = runGit(worktreePath, [
+    "diff",
+    "--cached",
+    "--binary",
+    "--no-ext-diff",
+    "HEAD",
+  ]).stdout;
   return {
     changedFiles,
     patch,

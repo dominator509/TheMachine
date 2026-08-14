@@ -1,20 +1,9 @@
 import { createHash } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { diffFromBase } from "./git.js";
 import { RunStateStore } from "./state.js";
-import type {
-  MachinePlan,
-  RunManifest,
-  ValidationResult,
-} from "./types.js";
+import type { MachinePlan, RunManifest, ValidationResult } from "./types.js";
 
 const SECRET_NAME_PATTERN = /(api.?key|token|secret|password|credential|private.?key)/i;
 const SECRET_VALUE_PATTERNS = [

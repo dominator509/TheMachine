@@ -48,11 +48,9 @@ describe("db tools", () => {
 
   it("creates deterministic migration scaffolds in the requested directory", () => {
     const dir = mkdtempSync(join(tmpdir(), "machine-migrations-"));
-    const output = runTool(
-      "tools/db/create-migration.mjs",
-      { MACHINE_MIGRATIONS_DIR: dir },
-      ["add provider cache"],
-    );
+    const output = runTool("tools/db/create-migration.mjs", { MACHINE_MIGRATIONS_DIR: dir }, [
+      "add provider cache",
+    ]);
 
     const migrationPath = join(dir, "M001_add_provider_cache.ts");
     expect(output).toContain("Migration scaffold created");

@@ -21,7 +21,10 @@ import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
 import type { ProductionApproval } from "@the-machine/service";
 import { createUI } from "@the-machine/ui-components";
 
-function acceptedApproval(workspaceId: EntityId, detail = "Accepted for release."): ProductionApproval {
+function acceptedApproval(
+  workspaceId: EntityId,
+  detail = "Accepted for release.",
+): ProductionApproval {
   const decision = acceptedReleaseDecision(detail);
   return {
     workspaceId,
@@ -218,15 +221,35 @@ describe("service handlers integration", () => {
       30000,
       decision,
     );
-    mcp.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", ["read-file"], decision);
-    plugin.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3, decision);
+    mcp.register(
+      "mcp-1" as EntityId,
+      "fs-tools",
+      "stdio",
+      "/tmp/mcp.sock",
+      ["read-file"],
+      decision,
+    );
+    plugin.register(
+      "pl-1" as EntityId,
+      "test-plugin",
+      "1.0.0" as SemVer,
+      "plugin.mjs",
+      3,
+      decision,
+    );
     const ui = createUI({ status: "accepted", detail: "Shared UI registry accepted." });
     approval.record({
       ...acceptedApproval("ws-1" as EntityId),
       releaseDeployment: { status: "pending", detail: "User approval not recorded." },
     });
 
-    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval });
+    const handler = createReadinessHandler({
+      providers: provider,
+      mcp,
+      plugins: plugin,
+      ui,
+      approval,
+    });
     const res = handler.check({ workspaceId: "ws-1" as EntityId });
 
     expect(res.overall).toBe("degraded");
@@ -235,7 +258,9 @@ describe("service handlers integration", () => {
 
   it("readiness handler accepts intentionally unconfigured provider MCP and plugin surfaces", () => {
     const approval = createProductionApprovalHandler();
-    approval.record(acceptedApproval("ws-1" as EntityId, "Operator accepted local-only release posture."));
+    approval.record(
+      acceptedApproval("ws-1" as EntityId, "Operator accepted local-only release posture."),
+    );
 
     const handler = createReadinessHandler({
       providers: createProviderHandler(),
@@ -269,12 +294,32 @@ describe("service handlers integration", () => {
       30000,
       decision,
     );
-    mcp.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", ["read-file"], decision);
-    plugin.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3, decision);
+    mcp.register(
+      "mcp-1" as EntityId,
+      "fs-tools",
+      "stdio",
+      "/tmp/mcp.sock",
+      ["read-file"],
+      decision,
+    );
+    plugin.register(
+      "pl-1" as EntityId,
+      "test-plugin",
+      "1.0.0" as SemVer,
+      "plugin.mjs",
+      3,
+      decision,
+    );
     const ui = createUI({ status: "accepted", detail: "Shared UI registry accepted." });
     approval.record(acceptedApproval("ws-1" as EntityId, "Dominic approved release/deployment."));
 
-    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval });
+    const handler = createReadinessHandler({
+      providers: provider,
+      mcp,
+      plugins: plugin,
+      ui,
+      approval,
+    });
     const res = handler.check({ workspaceId: "ws-1" as EntityId });
 
     expect(res.overall).toBe("ready");

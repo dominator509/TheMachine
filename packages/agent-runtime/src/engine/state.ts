@@ -11,12 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import type {
-  ApprovalRecord,
-  MachinePlan,
-  RunEvent,
-  RunManifest,
-} from "./types.js";
+import type { ApprovalRecord, MachinePlan, RunEvent, RunManifest } from "./types.js";
 
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/;
 

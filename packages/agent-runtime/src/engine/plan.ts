@@ -148,11 +148,20 @@ function validateWorker(value: unknown, path: string, errors: string[]): value i
       errors.push(`${path}.executable: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  if (!Array.isArray(value["args"]) || (value["args"] as unknown[]).some((arg) => typeof arg !== "string")) {
+  if (
+    !Array.isArray(value["args"]) ||
+    (value["args"] as unknown[]).some((arg) => typeof arg !== "string")
+  ) {
     errors.push(`${path}.args must be an array of strings.`);
   }
   validatePositiveInteger(value["timeoutMs"], `${path}.timeoutMs`, errors, 1, 24 * 60 * 60 * 1_000);
-  validatePositiveInteger(value["maxOutputBytes"], `${path}.maxOutputBytes`, errors, 1, 64 * 1024 * 1024);
+  validatePositiveInteger(
+    value["maxOutputBytes"],
+    `${path}.maxOutputBytes`,
+    errors,
+    1,
+    64 * 1024 * 1024,
+  );
   const environment = value["environment"];
   if (
     environment !== undefined &&
@@ -181,7 +190,8 @@ function validateTask(value: unknown, path: string, errors: string[]): value is 
   const dependencies = value["dependsOn"];
   if (
     dependencies !== undefined &&
-    (!Array.isArray(dependencies) || dependencies.some((dependency) => typeof dependency !== "string"))
+    (!Array.isArray(dependencies) ||
+      dependencies.some((dependency) => typeof dependency !== "string"))
   ) {
     errors.push(`${path}.dependsOn must be an array of task IDs.`);
   }
@@ -225,7 +235,13 @@ function validatePolicy(value: unknown, path: string, errors: string[]): value i
   validatePathPatterns(value["allowedPaths"], `${path}.allowedPaths`, errors);
   validatePathPatterns(value["deniedPaths"], `${path}.deniedPaths`, errors);
   validatePositiveInteger(value["maxChangedFiles"], `${path}.maxChangedFiles`, errors, 1, 100_000);
-  validatePositiveInteger(value["maxPatchBytes"], `${path}.maxPatchBytes`, errors, 1, 128 * 1024 * 1024);
+  validatePositiveInteger(
+    value["maxPatchBytes"],
+    `${path}.maxPatchBytes`,
+    errors,
+    1,
+    128 * 1024 * 1024,
+  );
   for (const key of ["allowDependencyChanges", "allowBinaryChanges", "keepWorktree"] as const) {
     if (value[key] !== undefined && typeof value[key] !== "boolean") {
       errors.push(`${path}.${key} must be boolean.`);
@@ -238,7 +254,8 @@ function validateGraph(tasks: readonly MachineTask[], errors: string[]): readonl
   const taskById = new Map(tasks.map((task) => [task.id, task]));
   for (const task of tasks) {
     for (const dependency of task.dependsOn ?? []) {
-      if (!taskById.has(dependency)) errors.push(`Task '${task.id}' depends on unknown task '${dependency}'.`);
+      if (!taskById.has(dependency))
+        errors.push(`Task '${task.id}' depends on unknown task '${dependency}'.`);
       if (dependency === task.id) errors.push(`Task '${task.id}' cannot depend on itself.`);
     }
   }
@@ -309,7 +326,10 @@ export function compileMachinePlan(
     errors.push("workers must be an array.");
   } else if (Array.isArray(workers)) {
     workers.forEach((worker, index) => validateWorker(worker, `workers[${String(index)}]`, errors));
-    const ids = workers.filter(isRecord).map((worker) => worker["id"]).filter((id): id is string => typeof id === "string");
+    const ids = workers
+      .filter(isRecord)
+      .map((worker) => worker["id"])
+      .filter((id): id is string => typeof id === "string");
     if (new Set(ids).size !== ids.length) errors.push("worker IDs must be unique.");
   }
 
@@ -321,7 +341,8 @@ export function compileMachinePlan(
     const fallbacks = workerStrategy["fallbacks"];
     if (
       fallbacks !== undefined &&
-      (!Array.isArray(fallbacks) || fallbacks.some((fallback) => !validId(fallback, "workerStrategy.fallbacks[]", errors)))
+      (!Array.isArray(fallbacks) ||
+        fallbacks.some((fallback) => !validId(fallback, "workerStrategy.fallbacks[]", errors)))
     ) {
       errors.push("workerStrategy.fallbacks must be an array of worker IDs.");
     }

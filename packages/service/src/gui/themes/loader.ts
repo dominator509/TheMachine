@@ -17,14 +17,18 @@ function resolveThemeDir(): string {
   try {
     const hasJson = fs.readdirSync(sourceDir).some((f) => f.endsWith(".json"));
     if (hasJson) return sourceDir;
-  } catch { /* directory may not exist */ }
+  } catch {
+    /* directory may not exist */
+  }
 
   // Fallback: same directory as this compiled JS file (dist/gui/themes/).
   const primary = __dirname;
   try {
     const hasJson = fs.readdirSync(primary).some((f) => f.endsWith(".json"));
     if (hasJson) return primary;
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   return sourceDir; // last resort
 }

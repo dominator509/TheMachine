@@ -90,9 +90,7 @@ describe("Machine plan compiler", () => {
 
   it("rejects unvalidated tasks, dependency cycles, and shell workers", () => {
     expect(() =>
-      compileMachinePlan(
-        fixturePlan({ tasks: [fixtureTask({ validations: [] })] }),
-      ),
+      compileMachinePlan(fixturePlan({ tasks: [fixtureTask({ validations: [] })] })),
     ).toThrow(PlanValidationError);
 
     expect(() =>

@@ -121,9 +121,7 @@ export function createDriftDetector(
 
       // Anomaly: drift delta exceeds threshold × baseline mean, AND baseline has sufficient data.
       const anomalous =
-        driftDelta !== null &&
-        baselineMean > 0 &&
-        driftDelta > cfg.driftThreshold * baselineMean;
+        driftDelta !== null && baselineMean > 0 && driftDelta > cfg.driftThreshold * baselineMean;
 
       windowIndex += 1;
 

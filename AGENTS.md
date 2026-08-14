@@ -103,6 +103,7 @@ Adapted from PANTAW META-KAIZEN-ADVISOR. When an agent discovers a bug, gap, or 
 ```
 
 **Proposal Discipline** (PANTAW principles):
+
 - ONE change per proposal. Not three. Not a bundle. One.
 - LOCAL change only. Affects one component, one file, one concern.
 - EVIDENCE-BACKED. Every proposal must name the specific failure and explain why the change fixes it. "This might help" is rejected.
@@ -110,11 +111,13 @@ Adapted from PANTAW META-KAIZEN-ADVISOR. When an agent discovers a bug, gap, or 
 - REVERSIBLE. Prefer prompt_refinement over gate_change over code_change over structural. Anything marked irreversible faces maximum scrutiny.
 
 **Halt Conditions** (Cold-Start & Circuit Breaker):
+
 - COLD-START: If KNOWN_ISSUES.md has zero entries and no test failures exist, proposals are halted. No data → no signal → no proposal.
 - CIRCUIT BREAKER: If three consecutive proposals are rejected by the human, the feedback loop halts. Drift is accelerating — human must reset the baseline.
 - DRIFT ACCELERATION: If resolved issues in KNOWN_ISSUES.md grow faster than new issues are found (resolved rate > discovery rate for 2+ audit cycles), the system is destabilizing. Alfred escalates to Dominic.
 
 **Validation Gate** (DRIFT-WARDEN adaptation) — Alfred validates every proposal:
+
 1. Envelope: Required fields present, proposal_id valid, change_type recognized.
 2. Invariants: Does not weaken iteration caps, does not bypass ACK protocol, does not remove write-protection, does not add undocumented dependencies.
 3. Scope: Affects exactly one component. No cross-cutting proposals without explicit human approval.
@@ -122,6 +125,7 @@ Adapted from PANTAW META-KAIZEN-ADVISOR. When an agent discovers a bug, gap, or 
 5. Reversibility: Rollback strategy is documented. Irreversible changes require human pre-approval before validation proceeds.
 
 **Promotion Flow:**
+
 ```
 Agent discovers gap → Posts <machine_proposal> in COMM_BUFFER.md slot → Flips ACK
 → Alfred reads proposal → Validates against 5 gates

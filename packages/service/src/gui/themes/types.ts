@@ -89,9 +89,9 @@ export interface ThemeManifest {
   bgm?: string;
   /** UI chrome theme colours. */
   chrome?: {
-    primary: string;    // e.g. "#2d1b4e"
-    secondary: string;  // e.g. "#c8a96e"
-    text: string;       // e.g. "#f5eedc"
-    panel: string;      // e.g. "rgba(0,0,0,0.7)"
+    primary: string; // e.g. "#2d1b4e"
+    secondary: string; // e.g. "#c8a96e"
+    text: string; // e.g. "#f5eedc"
+    panel: string; // e.g. "rgba(0,0,0,0.7)"
   };
 }

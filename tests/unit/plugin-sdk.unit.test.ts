@@ -121,7 +121,11 @@ describe("listPlugins", () => {
   it("lists all registered plugins", () => {
     let registry = createPluginRegistry();
     registry = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    registry = registerPlugin(registry, { ...SAMPLE_MANIFEST, id: "plugin-2" as any, name: "Plugin 2" }, {});
+    registry = registerPlugin(
+      registry,
+      { ...SAMPLE_MANIFEST, id: "plugin-2" as any, name: "Plugin 2" },
+      {},
+    );
     const all = listPlugins(registry);
     expect(all).toHaveLength(2);
   });
@@ -198,7 +202,11 @@ describe("createPluginContext", () => {
 describe("invokePluginHook", () => {
   it("invokes onLoad hook with context", () => {
     let loaded = false;
-    const hooks = { onLoad: () => { loaded = true; } };
+    const hooks = {
+      onLoad: () => {
+        loaded = true;
+      },
+    };
     const registry = createPluginRegistry();
     const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
     const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
@@ -213,7 +221,11 @@ describe("invokePluginHook", () => {
 
   it("invokes onUnload hook with context", () => {
     let unloaded = false;
-    const hooks = { onUnload: () => { unloaded = true; } };
+    const hooks = {
+      onUnload: () => {
+        unloaded = true;
+      },
+    };
     const registry = createPluginRegistry();
     const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
     const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
@@ -227,7 +239,11 @@ describe("invokePluginHook", () => {
 
   it("invokes onConfigure hook with config argument", () => {
     let captured: Record<string, unknown> | undefined;
-    const hooks = { onConfigure: (cfg: Record<string, unknown>) => { captured = cfg; } };
+    const hooks = {
+      onConfigure: (cfg: Record<string, unknown>) => {
+        captured = cfg;
+      },
+    };
     const registry = createPluginRegistry();
     const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
     const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
@@ -241,7 +257,12 @@ describe("invokePluginHook", () => {
 
   it("invokes onExecute hook with input", () => {
     let input: unknown;
-    const hooks = { onExecute: (i: unknown) => { input = i; return "processed"; } };
+    const hooks = {
+      onExecute: (i: unknown) => {
+        input = i;
+        return "processed";
+      },
+    };
     const registry = createPluginRegistry();
     const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
     const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
@@ -267,7 +288,11 @@ describe("invokePluginHook", () => {
   });
 
   it("captures errors thrown by hooks", () => {
-    const hooks = { onLoad: () => { throw new Error("Hook crashed"); } };
+    const hooks = {
+      onLoad: () => {
+        throw new Error("Hook crashed");
+      },
+    };
     const registry = createPluginRegistry();
     const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
     const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
@@ -381,7 +406,10 @@ describe("createSandboxedExecutor", () => {
       `,
     });
     const executor = createSandboxedExecutor();
-    const result = await executor.executeOnLoad(sandboxInstance(join(dir, "plugin.mjs")), sandboxContext(dir));
+    const result = await executor.executeOnLoad(
+      sandboxInstance(join(dir, "plugin.mjs")),
+      sandboxContext(dir),
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("sandbox boom");

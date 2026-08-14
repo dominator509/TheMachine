@@ -18,18 +18,22 @@ export default defineConfig({
   },
   test: {
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'json', 'lcov'],
-      exclude: ['**/node_modules/**', '**/dist/**', '**/tests/**', '**/tools/**', '**/scripts/**'],
+      provider: "v8",
+      reporter: ["text", "html", "json", "lcov"],
+      exclude: ["**/node_modules/**", "**/dist/**", "**/tests/**", "**/tools/**", "**/scripts/**"],
       all: true,
-      include: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
+      include: ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts"],
     },
     workspace: [
       {
         extends: true,
         test: {
           name: "unit",
-          include: ["tests/**/*.unit.test.ts", "packages/*/tests/**/*.unit.test.ts", "apps/*/tests/**/*.unit.test.ts"],
+          include: [
+            "tests/**/*.unit.test.ts",
+            "packages/*/tests/**/*.unit.test.ts",
+            "apps/*/tests/**/*.unit.test.ts",
+          ],
           environment: "node",
         },
       },
@@ -37,7 +41,11 @@ export default defineConfig({
         extends: true,
         test: {
           name: "integration",
-          include: ["tests/**/*.integration.test.ts", "packages/*/tests/**/*.integration.test.ts", "apps/*/tests/**/*.integration.test.ts"],
+          include: [
+            "tests/**/*.integration.test.ts",
+            "packages/*/tests/**/*.integration.test.ts",
+            "apps/*/tests/**/*.integration.test.ts",
+          ],
           environment: "node",
         },
       },
