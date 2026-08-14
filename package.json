@@ -2,6 +2,7 @@
   "name": "the-machine",
   "version": "0.3.0-alpha.1",
   "private": true,
+  "type": "module",
   "description": "Durable local-first control plane for agentic software delivery",
   "packageManager": "pnpm@11.6.0",
   "engines": {
