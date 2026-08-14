@@ -522,8 +522,8 @@ function renderSnapshot(snapshot: RunSnapshot): void {
   const approval = approvalContext(manifest);
   ui.approvalPanel.classList.toggle("hidden", approval === null);
   if (approval) {
-    ui.approvalPanel.dataset.taskId = approval.taskId;
-    ui.approvalPanel.dataset.phase = approval.phase;
+    ui.approvalPanel.dataset["taskId"] = approval.taskId;
+    ui.approvalPanel.dataset["phase"] = approval.phase;
     ui.approvalTitle.textContent = `${approval.phase === "before" ? "Pre-execution" : "Post-patch"} approval required`;
     ui.approvalDescription.textContent = `Task ${approval.taskId} is paused. Review the task, events, and diff before deciding.`;
   }
@@ -598,20 +598,20 @@ function renderWorkers(): void {
 function switchView(view: ConsoleState["activeView"]): void {
   state.activeView = view;
   document.querySelectorAll<HTMLElement>("[data-view-panel]").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.viewPanel === view);
+    panel.classList.toggle("active", panel.dataset["viewPanel"] === view);
   });
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === view);
+    button.classList.toggle("active", button.dataset["view"] === view);
   });
 }
 
 function switchDetailTab(tab: ConsoleState["detailTab"]): void {
   state.detailTab = tab;
   document.querySelectorAll<HTMLElement>("[data-detail-panel]").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.detailPanel === tab);
+    panel.classList.toggle("active", panel.dataset["detailPanel"] === tab);
   });
   document.querySelectorAll<HTMLButtonElement>("[data-detail-tab]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.detailTab === tab);
+    button.classList.toggle("active", button.dataset["detailTab"] === tab);
   });
 }
 
@@ -780,8 +780,8 @@ async function cancelSelectedRun(): Promise<void> {
 
 async function decideApproval(decision: "approve" | "reject"): Promise<void> {
   const runId = state.selectedRunId;
-  const taskId = ui.approvalPanel.dataset.taskId;
-  const phase = ui.approvalPanel.dataset.phase as ApprovalPhase | undefined;
+  const taskId = ui.approvalPanel.dataset["taskId"];
+  const phase = ui.approvalPanel.dataset["phase"] as ApprovalPhase | undefined;
   if (!runId || !taskId || (phase !== "before" && phase !== "after")) {
     throw new Error("No pending approval is selected.");
   }
@@ -924,12 +924,12 @@ function bindEvents(): void {
   });
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
     button.addEventListener("click", () =>
-      switchView(button.dataset.view as ConsoleState["activeView"]),
+      switchView(button.dataset["view"] as ConsoleState["activeView"]),
     );
   });
   document.querySelectorAll<HTMLButtonElement>("[data-detail-tab]").forEach((button) => {
     button.addEventListener("click", () =>
-      switchDetailTab(button.dataset.detailTab as ConsoleState["detailTab"]),
+      switchDetailTab(button.dataset["detailTab"] as ConsoleState["detailTab"]),
     );
   });
 }
