@@ -40,14 +40,15 @@ function commandSpec(
   };
   const passEnvironment = [...(entry.passEnvironment ?? []), ...(options.passEnvironment ?? [])];
 
+  const timeoutMs = options.timeoutMs ?? entry.timeoutMs;
   return {
     executable: base.executable,
     args: [...(base.args ?? []), ...userArgs],
     cwd: base.cwd,
-    timeoutMs: options.timeoutMs ?? entry.timeoutMs,
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     environment,
     passEnvironment,
-    maxOutputBytes: options.maxOutputBytes,
+    ...(options.maxOutputBytes !== undefined ? { maxOutputBytes: options.maxOutputBytes } : {}),
   };
 }
 

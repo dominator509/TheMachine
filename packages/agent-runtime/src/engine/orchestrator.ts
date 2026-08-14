@@ -73,6 +73,10 @@ function completedOutcome(manifest: RunManifest): RunOutcome {
   };
 }
 
+function currentRunStatus(manifest: RunManifest): RunManifest["status"] {
+  return manifest.status;
+}
+
 function isCompiled(value: MachinePlan | CompiledMachinePlan): value is CompiledMachinePlan {
   return "plan" in value && "digest" in value && "taskOrder" in value;
 }
@@ -502,7 +506,7 @@ export class AgenticRuntime {
             preparedAttempt,
           );
           if (completed) continue;
-          if (manifest.status === "cancelled") break;
+          if (currentRunStatus(manifest) === "cancelled") break;
         }
 
         const completed = await this.executeTask(
@@ -514,7 +518,9 @@ export class AgenticRuntime {
           runWorkers,
         );
         if (!completed) {
-          if (manifest.status === "awaiting_approval") return completedOutcome(manifest);
+          if (currentRunStatus(manifest) === "awaiting_approval") {
+            return completedOutcome(manifest);
+          }
           break;
         }
       }
@@ -624,7 +630,7 @@ export class AgenticRuntime {
       attempt.patchBytes = staged.patchBytes;
       const decision = evaluatePatchPolicy({
         task,
-        planPolicy: compiled.plan.policy,
+        ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),
         attempt: attemptNumber,
         patch: staged,
         decidedAt: this.clock().toISOString(),
@@ -869,7 +875,7 @@ export class AgenticRuntime {
     const finalPatch = stageAndInspect(manifest.worktreePath);
     const finalDecision = evaluatePatchPolicy({
       task,
-      planPolicy: compiled.plan.policy,
+      ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),
       attempt: attempt.attempt,
       patch: finalPatch,
       decidedAt: this.clock().toISOString(),
