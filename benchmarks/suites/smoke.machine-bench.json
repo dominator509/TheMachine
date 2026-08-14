@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "smoke",
+  "title": "The Machine public smoke benchmark",
+  "description": "Small deterministic repository repairs used for CI and cross-worker comparisons.",
+  "cases": [
+    {
+      "id": "fix-addition",
+      "title": "Repair a JavaScript arithmetic defect",
+      "fixture": "javascript-addition",
+      "objective": "Fix src/math.mjs so add(a, b) returns the mathematical sum. Keep the public API unchanged and do not edit the test.",
+      "allowedPaths": ["src/math.mjs"],
+      "expectedChangedPaths": ["src/math.mjs"],
+      "validations": [
+        {
+          "id": "node-test",
+          "executable": "node",
+          "args": ["test.mjs"],
+          "timeoutMs": 30000,
+          "expectedExitCode": 0,
+          "stdoutIncludes": "addition: ok"
+        }
+      ]
+    },
+    {
+      "id": "normalize-greeting",
+      "title": "Implement a bounded text normalization rule",
+      "fixture": "greeting-normalizer",
+      "objective": "Implement normalizeGreeting in src/greeting.mjs. It must trim surrounding whitespace, collapse internal whitespace runs to one space, and return a sentence with the first character uppercased and exactly one trailing exclamation mark. Do not edit the test.",
+      "allowedPaths": ["src/greeting.mjs"],
+      "expectedChangedPaths": ["src/greeting.mjs"],
+      "validations": [
+        {
+          "id": "node-test",
+          "executable": "node",
+          "args": ["test.mjs"],
+          "timeoutMs": 30000,
+          "expectedExitCode": 0,
+          "stdoutIncludes": "greeting: ok"
+        }
+      ]
+    }
+  ]
+}
