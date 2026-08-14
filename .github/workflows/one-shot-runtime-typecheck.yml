@@ -86,7 +86,11 @@ jobs:
               text,
               "        planPolicy: compiled.plan.policy,",
               "        ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),",
-              expected=2,
+          )
+          text = replace_checked(
+              text,
+              "      planPolicy: compiled.plan.policy,",
+              "      ...(compiled.plan.policy ? { planPolicy: compiled.plan.policy } : {}),",
           )
           orchestrator.write_text(text, encoding="utf-8")
           PY
