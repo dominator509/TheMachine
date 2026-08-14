@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 
+import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createAgenticRuntime,
   loadMachinePlan,
+  loadRunConsoleSnapshot,
+  probeWorkers,
   type AgenticRunStatus,
   type KaizenProposal,
+  type MachineWorker,
+  type RunConsoleSnapshot,
   type RunManifest,
 } from "@the-machine/agent-runtime";
 import { PLATFORM_NAME } from "@the-machine/core";
@@ -18,9 +24,12 @@ import {
 } from "@the-machine/service";
 import type { ServiceClient } from "@the-machine/service";
 
-const VERSION = "0.2.0-alpha.1";
+const VERSION = "0.3.0-alpha.1";
 const CWD = process.cwd();
 const DEFAULT_WS_ID = "default" as EntityId;
+const BENCHMARK_ENTRY = fileURLToPath(
+  new URL("../../../tools/benchmark/benchmark.mjs", import.meta.url),
+);
 const agentic = createAgenticRuntime();
 let serviceClient: ServiceClient | null = null;
 
@@ -49,12 +58,20 @@ function showHelp(): void {
   console.log("  run <plan.machine.json>                 Execute a plan in an isolated Git worktree");
   console.log("  resume <run-id> [repository]            Resume from the last durable checkpoint");
   console.log("  status <run-id> [repository]            Show a durable run manifest");
+  console.log("  snapshot <run-id> [repository] [seq]    Load console state, events, diff, and artifacts");
   console.log("  runs [repository]                       List local runs");
+  console.log("  logs <run-id> [repository]              Show the append-only event stream");
+  console.log("  diff <run-id> [repository]              Show the run patch from its base commit");
+  console.log("  artifacts <run-id> [repository]         List durable run artifacts");
   console.log("  cancel <run-id> [repository] [reason]   Request cooperative cancellation");
   console.log("  approve <run-id> <task> <phase> [...]   Approve a before/after task gate");
   console.log("  reject <run-id> <task> <phase> [...]    Reject a before/after task gate");
-  console.log("  workers <plan.machine.json>              Inspect worker capabilities without secrets");
+  console.log("  workers [plan.machine.json]              Probe built-ins and inspect plan workers");
   console.log("  evidence verify <directory>             Verify SHA-256 evidence integrity");
+  console.log("");
+  console.log("Public benchmark harness:");
+  console.log("  benchmark list                           List benchmark suites");
+  console.log("  benchmark run [harness options]          Run a reproducible worker benchmark");
   console.log("");
   console.log("Kaizen feedback loop:");
   console.log("  kaizen analyze [repository] [minimum]    Generate one evidence-backed proposal");
@@ -65,23 +82,11 @@ function showHelp(): void {
   console.log("  kaizen materialize <id> [repository]     Write an approved .machine.json plan");
   console.log("  kaizen record <id> <run-id> [repository] Record experiment outcome");
   console.log("");
-  console.log("Legacy compatibility and diagnostics:");
-  console.log("  help                                      Show this help message");
-  console.log("  version                                   Show version");
-  console.log("  doctor [plan.machine.json]                Inspect repository and plan readiness");
-  console.log("  health                                    Check service health");
-  console.log("  workspace [path]                          Show or create workspace metadata");
-  console.log("  repo [path]                               Discover the real repository profile");
-  console.log("  plan <file>                               Load a legacy Markdown ExecPlan");
-  console.log("  plans                                     List loaded legacy plans");
-  console.log("  validation <run-id>                       Show legacy validation results");
-  console.log("  providers | provider <id>                 Inspect provider metadata");
-  console.log("  mcp | mcp-server <id>                     Inspect MCP metadata");
-  console.log("  plugins | plugin <id>                     Inspect plugin metadata");
-  console.log("  readiness [subsystem]                     Check readiness gates");
-  console.log("  diagnostics                               Run local diagnostics");
-  console.log("  gui [port]                                Start the loopback War Council GUI");
-  console.log("  gui:themes                                List available GUI themes");
+  console.log("Compatibility and diagnostics:");
+  console.log("  help | version | doctor | health | diagnostics");
+  console.log("  workspace | repo | plan | plans | validation");
+  console.log("  providers | provider | mcp | mcp-server | plugins | plugin");
+  console.log("  readiness | gui | gui:themes");
   console.log("");
   console.log("Flags:");
   console.log("  --json                                    Emit structured JSON where supported");
@@ -114,6 +119,18 @@ function manifestText(manifest: RunManifest): string {
   ].join("\n");
 }
 
+function snapshotText(snapshot: RunConsoleSnapshot): string {
+  return [
+    manifestText(snapshot.manifest),
+    "",
+    `Events: ${String(snapshot.events.length)}`,
+    `Approvals: ${String(snapshot.approvals.length)}`,
+    `Artifacts: ${String(snapshot.artifacts.filter((artifact) => artifact.kind === "file").length)}`,
+    `Diff bytes: ${String(Buffer.byteLength(snapshot.diff, "utf-8"))}`,
+    `Evidence integrity: ${snapshot.evidenceVerification?.valid === true ? "verified" : snapshot.evidenceVerification ? "invalid" : "not finalized"}`,
+  ].join("\n");
+}
+
 function setRunExitCode(status: AgenticRunStatus): void {
   process.exitCode = status === "completed" ? 0 : status === "awaiting_approval" ? 2 : 1;
 }
@@ -135,6 +152,24 @@ function showRunStatus(runId: string, repository: string, jsonMode: boolean): vo
   output(jsonMode ? manifest : manifestText(manifest), jsonMode);
 }
 
+function runSnapshot(
+  runId: string,
+  repository: string,
+  afterSequence: number,
+): RunConsoleSnapshot {
+  return loadRunConsoleSnapshot(runId, resolve(repository), undefined, afterSequence);
+}
+
+function showSnapshot(
+  runId: string,
+  repository: string,
+  afterSequence: number,
+  jsonMode: boolean,
+): void {
+  const snapshot = runSnapshot(runId, repository, afterSequence);
+  output(jsonMode ? snapshot : snapshotText(snapshot), jsonMode);
+}
+
 function listRuns(repository: string, jsonMode: boolean): void {
   const manifests = agentic.listRuns(resolve(repository));
   if (jsonMode) {
@@ -152,30 +187,74 @@ function listRuns(repository: string, jsonMode: boolean): void {
   }
 }
 
-function inspectWorkers(planPath: string, jsonMode: boolean): void {
-  const compiled = loadMachinePlan(resolve(planPath));
-  const workers = (compiled.plan.workers ?? []).map((worker) => ({
-    id: worker.id,
-    kind: worker.kind,
-    executable: worker.executable,
-    args: worker.args,
-    timeoutMs: worker.timeoutMs ?? null,
-    passEnvironment: worker.passEnvironment ?? [],
-    fixedEnvironmentKeys: Object.keys(worker.environment ?? {}).sort(),
-  }));
+function showLogs(runId: string, repository: string, jsonMode: boolean): void {
+  const events = runSnapshot(runId, repository, 0).events;
+  if (jsonMode) output(events, true);
+  else {
+    for (const event of events) {
+      console.log(
+        `${String(event.sequence).padStart(5)}  ${event.timestamp}  ${event.type.padEnd(30)}  ${event.taskId ?? "run"}  ${event.workerId ?? "system"}`,
+      );
+    }
+  }
+}
+
+function showDiff(runId: string, repository: string, jsonMode: boolean): void {
+  const diff = runSnapshot(runId, repository, 0).diff;
+  output(jsonMode ? { runId, diff } : diff || "No diff available.", jsonMode);
+}
+
+function showArtifacts(runId: string, repository: string, jsonMode: boolean): void {
+  const artifacts = runSnapshot(runId, repository, 0).artifacts;
+  if (jsonMode) output(artifacts, true);
+  else {
+    for (const artifact of artifacts) {
+      console.log(
+        `${artifact.kind.padEnd(9)}  ${String(artifact.size).padStart(10)}  ${artifact.modifiedAt}  ${artifact.path}`,
+      );
+    }
+  }
+}
+
+async function inspectWorkers(planPath: string | undefined, jsonMode: boolean): Promise<void> {
+  const workers = new Map<string, MachineWorker>(
+    agentic.listWorkers().map((worker) => [worker.id, worker]),
+  );
+  const compiled = planPath ? loadMachinePlan(resolve(planPath)) : null;
+  const probes = await probeWorkers(Array.from(workers.values()));
   const result = {
-    planId: compiled.plan.id,
-    planDigest: compiled.digest,
-    strategy: compiled.plan.workerStrategy,
-    workers,
+    workers: probes,
+    plan: compiled
+      ? {
+          id: compiled.plan.id,
+          title: compiled.plan.title,
+          digest: compiled.digest,
+          strategy: compiled.plan.workerStrategy,
+          configuredWorkers: (compiled.plan.workers ?? []).map((worker) => ({
+            id: worker.id,
+            executable: worker.executable,
+            args: worker.args,
+            timeoutMs: worker.timeoutMs ?? null,
+            passEnvironment: worker.passEnvironment ?? [],
+            fixedEnvironmentKeys: Object.keys(worker.environment ?? {}).sort(),
+            overridesBuiltin: workers.has(worker.id),
+          })),
+        }
+      : null,
   };
   if (jsonMode) output(result, true);
   else {
-    console.log(`Plan: ${result.planId}`);
-    console.log(`Digest: ${result.planDigest}`);
-    console.log(`Primary: ${result.strategy.primary}`);
-    for (const worker of workers) {
-      console.log(`  ${worker.id}: ${worker.executable} ${worker.args.join(" ")}`);
+    for (const probe of probes) {
+      console.log(
+        `${probe.available ? "READY" : "MISSING"}  ${probe.id.padEnd(14)}  ${probe.version ?? "unknown"}  ${probe.executable}`,
+      );
+      if (!probe.available) console.log(`  ${probe.message}`);
+    }
+    if (compiled) {
+      console.log("");
+      console.log(`Plan: ${compiled.plan.id}`);
+      console.log(`Primary: ${compiled.plan.workerStrategy.primary}`);
+      console.log(`Fallbacks: ${(compiled.plan.workerStrategy.fallbacks ?? []).join(", ") || "none"}`);
     }
   }
 }
@@ -191,20 +270,28 @@ function validatePlan(planPath: string, jsonMode: boolean): void {
     taskOrder: compiled.taskOrder,
     workerStrategy: compiled.plan.workerStrategy,
   };
-  output(jsonMode ? result : `Valid plan '${result.id}'\nDigest: ${result.digest}\nTasks: ${result.taskOrder.join(" -> ")}`, jsonMode);
+  output(
+    jsonMode
+      ? result
+      : `Valid plan '${result.id}'\nDigest: ${result.digest}\nTasks: ${result.taskOrder.join(" -> ")}`,
+    jsonMode,
+  );
 }
 
-function doctor(planPath: string | undefined, jsonMode: boolean): void {
+async function doctor(planPath: string | undefined, jsonMode: boolean): Promise<void> {
   const repository = client().repo.discover({ workspaceId: DEFAULT_WS_ID, rootPath: CWD });
+  const workerProbes = await probeWorkers(agentic.listWorkers());
   const report: Record<string, unknown> = {
     platform: PLATFORM_NAME,
     version: VERSION,
     node: process.versions.node,
     repository,
+    workers: workerProbes,
     checks: {
       gitRepository: repository.hasGit,
       packageManifest: repository.hasPackageJson,
       supportedNode: Number(process.versions.node.split(".")[0] ?? "0") >= 22,
+      availableBuiltinWorkers: workerProbes.filter((probe) => probe.available).length,
     },
   };
   if (planPath) {
@@ -241,7 +328,11 @@ function handleKaizen(args: readonly string[], jsonMode: boolean): void {
       minimumOccurrences: Number.isFinite(minimum) ? minimum : 2,
     });
     output(
-      proposal ? (jsonMode ? proposal : kaizenText(proposal)) : "No recurring evidence signal met the proposal threshold.",
+      proposal
+        ? jsonMode
+          ? proposal
+          : kaizenText(proposal)
+        : "No recurring evidence signal met the proposal threshold.",
       jsonMode,
     );
     return;
@@ -251,7 +342,10 @@ function handleKaizen(args: readonly string[], jsonMode: boolean): void {
     const proposals = agentic.kaizen(resolve(repository)).list();
     if (jsonMode) output(proposals, true);
     else if (proposals.length === 0) console.log("No Kaizen proposals found.");
-    else proposals.forEach((proposal) => console.log(`${proposal.id}  ${proposal.status}  ${proposal.signal.key}`));
+    else
+      proposals.forEach((proposal) =>
+        console.log(`${proposal.id}  ${proposal.status}  ${proposal.signal.key}`),
+      );
     return;
   }
   const id = args[2];
@@ -276,7 +370,8 @@ function handleKaizen(args: readonly string[], jsonMode: boolean): void {
   } else if (action === "record") {
     const runId = args[3];
     const recordRepository = args[4] ?? CWD;
-    if (!runId) throw new Error("Usage: machine kaizen record <proposal-id> <run-id> [repository]");
+    if (!runId)
+      throw new Error("Usage: machine kaizen record <proposal-id> <run-id> [repository]");
     const proposal = agentic.kaizen(resolve(recordRepository)).recordValidation(id, runId);
     output(jsonMode ? proposal : kaizenText(proposal), jsonMode);
   } else {
@@ -284,12 +379,34 @@ function handleKaizen(args: readonly string[], jsonMode: boolean): void {
   }
 }
 
+function benchmark(args: readonly string[], jsonMode: boolean): void {
+  const action = args[1] ?? "list";
+  let benchmarkArgs: string[];
+  if (action === "list") benchmarkArgs = ["--list"];
+  else if (action === "run") benchmarkArgs = [...args.slice(2)];
+  else throw new Error("Usage: machine benchmark <list|run> [benchmark options]");
+  if (jsonMode) benchmarkArgs.push("--json");
+  const result = spawnSync(process.execPath, [BENCHMARK_ENTRY, ...benchmarkArgs], {
+    cwd: CWD,
+    env: process.env,
+    encoding: "utf-8",
+    shell: false,
+    windowsHide: true,
+    timeout: 6 * 60 * 60 * 1000,
+    maxBuffer: 128 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  process.stdout.write(result.stdout ?? "");
+  process.stderr.write(result.stderr ?? "");
+  process.exitCode = result.status ?? 1;
+}
+
 function showHealth(jsonMode: boolean): void {
   const state = client().health.check({});
   output(
     jsonMode
       ? state
-      : `Status: ${state.status}\nPlatform: ${state.platform}\nVersion: ${state.version}\nUptime: ${String(state.uptimeMs)}ms`,
+      : `Status: ${state.status}\nPlatform: ${state.platform}\nVersion: ${state.version}\nUptime: ${String(state.uptimeMs)}ms\nhealth: ok`,
     jsonMode,
   );
 }
@@ -333,20 +450,29 @@ function showValidation(runId: string, jsonMode: boolean): void {
   const result = client().validation.list(runId as EntityId);
   if (jsonMode) output(result, true);
   else if (result.validations.length === 0) console.log("No validations recorded.");
-  else result.validations.forEach((validation) =>
-    console.log(`${validation.command}: ${validation.passed ? "PASS" : "FAIL"} (exit ${validation.exitCode ?? "?"})`),
-  );
+  else
+    result.validations.forEach((validation) =>
+      console.log(
+        `${validation.command}: ${validation.passed ? "PASS" : "FAIL"} (exit ${validation.exitCode ?? "?"})`,
+      ),
+    );
 }
 
 function showProviders(jsonMode: boolean): void {
   const providers = client().provider.list().providers;
   if (jsonMode) output(providers, true);
   else if (providers.length === 0) console.log("No providers configured.");
-  else providers.forEach((provider) => console.log(`${provider.id} — ${provider.name} (${provider.tier})`));
+  else
+    providers.forEach((provider) =>
+      console.log(`${provider.id} — ${provider.name} (${provider.tier})`),
+    );
 }
 
 function showProvider(id: string, jsonMode: boolean): void {
-  const provider = client().provider.get({ workspaceId: DEFAULT_WS_ID, providerId: id as EntityId });
+  const provider = client().provider.get({
+    workspaceId: DEFAULT_WS_ID,
+    providerId: id as EntityId,
+  });
   output(
     jsonMode
       ? provider ?? { error: "Not found" }
@@ -361,7 +487,10 @@ function showMcp(jsonMode: boolean): void {
   const servers = client().mcp.list().servers;
   if (jsonMode) output(servers, true);
   else if (servers.length === 0) console.log("No MCP servers registered.");
-  else servers.forEach((server) => console.log(`${server.id} — ${server.name} (${server.transport})`));
+  else
+    servers.forEach((server) =>
+      console.log(`${server.id} — ${server.name} (${server.transport})`),
+    );
 }
 
 function showMcpServer(id: string, jsonMode: boolean): void {
@@ -384,7 +513,10 @@ function showPlugins(jsonMode: boolean): void {
 }
 
 function showPlugin(id: string, jsonMode: boolean): void {
-  const plugin = client().plugin.get({ workspaceId: DEFAULT_WS_ID, pluginId: id as EntityId });
+  const plugin = client().plugin.get({
+    workspaceId: DEFAULT_WS_ID,
+    pluginId: id as EntityId,
+  });
   output(
     jsonMode
       ? plugin ?? { error: "Not found" }
@@ -396,14 +528,18 @@ function showPlugin(id: string, jsonMode: boolean): void {
 }
 
 function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
-  const request: { workspaceId: EntityId; subsystem?: string } = { workspaceId: DEFAULT_WS_ID };
+  const request: { workspaceId: EntityId; subsystem?: string } = {
+    workspaceId: DEFAULT_WS_ID,
+  };
   if (subsystem) request.subsystem = subsystem;
   const result = client().readiness.check(request);
   if (jsonMode) output(result, true);
   else {
     console.log(`Overall: ${result.overall}`);
     result.gates.forEach((gate) =>
-      console.log(`${gate.subsystem}: ${gate.status} (${String(gate.passedChecks)}/${String(gate.totalChecks)})`),
+      console.log(
+        `${gate.subsystem}: ${gate.status} (${String(gate.passedChecks)}/${String(gate.totalChecks)})`,
+      ),
     );
   }
 }
@@ -411,20 +547,33 @@ function showReadiness(subsystem: string | undefined, jsonMode: boolean): void {
 function showDiagnostics(jsonMode: boolean): void {
   const health = client().health.check({ detail: true });
   const repository = client().repo.discover({ workspaceId: DEFAULT_WS_ID, rootPath: CWD });
-  output({
-    platform: health.platform,
-    version: health.version,
-    cwd: CWD,
-    node: process.versions.node,
-    repository,
-    uptimeMs: health.uptimeMs,
-    checks: health.checks,
-  }, jsonMode);
+  if (jsonMode) {
+    output(
+      {
+        platform: health.platform,
+        version: health.version,
+        cwd: CWD,
+        node: process.versions.node,
+        repository,
+        uptimeMs: health.uptimeMs,
+        checks: health.checks,
+      },
+      true,
+    );
+  } else {
+    console.log(`Platform: ${health.platform}`);
+    console.log(`Version: ${health.version}`);
+    console.log(`CWD: ${CWD}`);
+    console.log(`Node.js: ${process.versions.node}`);
+    console.log(`Repository: ${repository.rootPath}`);
+    console.log("diagnostics: ok");
+  }
 }
 
 function startGui(portArgument: string | undefined): void {
   const port = portArgument ? Number.parseInt(portArgument, 10) : 3000;
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error(`Invalid port: ${portArgument ?? "undefined"}`);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535)
+    throw new Error(`Invalid port: ${portArgument ?? "undefined"}`);
   startGuiServer({ port, host: "127.0.0.1" });
   console.log(`Dashboard: http://127.0.0.1:${String(port)}/`);
   console.log(`Builder: http://127.0.0.1:${String(port)}/builder`);
@@ -439,14 +588,19 @@ function startGui(portArgument: string | undefined): void {
 function showGuiThemes(jsonMode: boolean): void {
   const themes = listThemes();
   if (jsonMode) output({ themes }, true);
-  else themes.forEach((theme) => console.log(`${theme.name} — ${theme.label}: ${theme.description}`));
+  else
+    themes.forEach((theme) =>
+      console.log(`${theme.name} — ${theme.label}: ${theme.description}`),
+    );
 }
 
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   const jsonMode = rawArgs.includes("--json");
   const helpRequested = rawArgs.includes("--help") || rawArgs.includes("-h");
-  const args = rawArgs.filter((arg) => arg !== "--json" && arg !== "--help" && arg !== "-h");
+  const args = rawArgs.filter(
+    (argument) => argument !== "--json" && argument !== "--help" && argument !== "-h",
+  );
   const command = helpRequested ? "help" : args[0] ?? "help";
 
   switch (command) {
@@ -472,8 +626,28 @@ async function main(): Promise<void> {
       if (!args[1]) throw new Error("Usage: machine status <run-id> [repository]");
       showRunStatus(args[1], args[2] ?? CWD, jsonMode);
       break;
+    case "snapshot": {
+      if (!args[1]) throw new Error("Usage: machine snapshot <run-id> [repository] [after-sequence]");
+      const sequence = args[3] ? Number.parseInt(args[3], 10) : 0;
+      if (!Number.isInteger(sequence) || sequence < 0)
+        throw new Error("after-sequence must be a non-negative integer.");
+      showSnapshot(args[1], args[2] ?? CWD, sequence, jsonMode);
+      break;
+    }
     case "runs":
       listRuns(args[1] ?? CWD, jsonMode);
+      break;
+    case "logs":
+      if (!args[1]) throw new Error("Usage: machine logs <run-id> [repository]");
+      showLogs(args[1], args[2] ?? CWD, jsonMode);
+      break;
+    case "diff":
+      if (!args[1]) throw new Error("Usage: machine diff <run-id> [repository]");
+      showDiff(args[1], args[2] ?? CWD, jsonMode);
+      break;
+    case "artifacts":
+      if (!args[1]) throw new Error("Usage: machine artifacts <run-id> [repository]");
+      showArtifacts(args[1], args[2] ?? CWD, jsonMode);
       break;
     case "cancel": {
       if (!args[1]) throw new Error("Usage: machine cancel <run-id> [repository] [reason]");
@@ -489,29 +663,35 @@ async function main(): Promise<void> {
       const taskId = args[2];
       const phase = args[3];
       if (!runId || !taskId || (phase !== "before" && phase !== "after")) {
-        throw new Error(`Usage: machine ${command} <run-id> <task-id> <before|after> [repository] [note]`);
+        throw new Error(
+          `Usage: machine ${command} <run-id> <task-id> <before|after> [repository] [note]`,
+        );
       }
       const repository = args[4] ?? CWD;
       const note = args.slice(5).join(" ") || `${command} by ${actorName()}.`;
-      const manifest = command === "approve"
-        ? agentic.approve(runId, taskId, phase, actorName(), note, resolve(repository))
-        : agentic.reject(runId, taskId, phase, actorName(), note, resolve(repository));
+      const manifest =
+        command === "approve"
+          ? agentic.approve(runId, taskId, phase, actorName(), note, resolve(repository))
+          : agentic.reject(runId, taskId, phase, actorName(), note, resolve(repository));
       output(jsonMode ? manifest : manifestText(manifest), jsonMode);
       break;
     }
     case "workers":
-      if (!args[1]) throw new Error("Usage: machine workers <plan.machine.json>");
-      inspectWorkers(args[1], jsonMode);
+      await inspectWorkers(args[1], jsonMode);
       break;
     case "evidence":
-      if (args[1] !== "verify" || !args[2]) throw new Error("Usage: machine evidence verify <directory>");
+      if (args[1] !== "verify" || !args[2])
+        throw new Error("Usage: machine evidence verify <directory>");
       output(agentic.verifyEvidence(resolve(args[2])), jsonMode);
+      break;
+    case "benchmark":
+      benchmark(args, jsonMode);
       break;
     case "kaizen":
       handleKaizen(args, jsonMode);
       break;
     case "doctor":
-      doctor(args[1], jsonMode);
+      await doctor(args[1], jsonMode);
       break;
     case "health":
       showHealth(jsonMode);
