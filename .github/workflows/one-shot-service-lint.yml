@@ -1,0 +1,105 @@
+name: One-shot service lint repair
+
+on:
+  push:
+    branches:
+      - codex/agentic-runtime-kaizen-v1
+    paths:
+      - .github/workflows/one-shot-service-lint.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.repository_owner == 'dominator509' && github.actor == 'dominator509'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply the three reported lint repairs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pipeline = Path("packages/service/src/gui/pipelineServer.ts")
+          text = pipeline.read_text(encoding="utf-8")
+          before = '''function safeDisplayText(value: unknown, maximumLength: number): value is string {
+            return (
+              typeof value === "string" &&
+              value.length > 0 &&
+              value.length <= maximumLength &&
+              !/[<>\\u0000-\\u001f]/.test(value)
+            );
+          }
+
+          function validTheme(value: unknown): value is ThemeManifest {
+            if (!isRecord(value)) return false;
+            if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(String(value["name"] ?? ""))) return false;
+          '''
+          after = '''function hasUnsafeDisplayCharacter(value: string): boolean {
+            for (const character of value) {
+              const code = character.charCodeAt(0);
+              if (character === "<" || character === ">" || code <= 0x1f) return true;
+            }
+            return false;
+          }
+
+          function safeDisplayText(value: unknown, maximumLength: number): value is string {
+            return (
+              typeof value === "string" &&
+              value.length > 0 &&
+              value.length <= maximumLength &&
+              !hasUnsafeDisplayCharacter(value)
+            );
+          }
+
+          function validTheme(value: unknown): value is ThemeManifest {
+            if (!isRecord(value)) return false;
+            const name = value["name"];
+            if (typeof name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name)) {
+              return false;
+            }
+          '''
+          if before not in text:
+              raise SystemExit("pipelineServer.ts expected lint fragment was not found")
+          pipeline.write_text(text.replace(before, after, 1), encoding="utf-8")
+
+          store = Path("packages/service/src/persistence/store.ts")
+          text = store.read_text(encoding="utf-8")
+          before = '    let stderr = "";\n    try {'
+          after = '    let stderr: string;\n    try {'
+          if before not in text:
+              raise SystemExit("store.ts expected stderr fragment was not found")
+          store.write_text(text.replace(before, after, 1), encoding="utf-8")
+          PY
+
+      - name: Format and verify service lint
+        run: |
+          pnpm exec prettier --write packages/service/src/gui/pipelineServer.ts packages/service/src/persistence/store.ts
+          pnpm --filter @the-machine/service lint
+
+      - name: Commit the bounded repair
+        run: |
+          git config user.name "The Machine CI"
+          git config user.email "ci@themachine.dev"
+          git add packages/service/src/gui/pipelineServer.ts packages/service/src/persistence/store.ts
+          git commit -m "fix(service): validate theme text without unsafe coercion"
+          git pull --rebase origin codex/agentic-runtime-kaizen-v1
+          git push origin HEAD:codex/agentic-runtime-kaizen-v1
