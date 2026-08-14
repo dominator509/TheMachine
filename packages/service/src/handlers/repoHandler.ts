@@ -16,10 +16,14 @@ function gitValue(rootPath: string, args: readonly string[]): string | null {
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  return result.status === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
+  return result.status === 0 && result.stdout.trim().length > 0
+    ? result.stdout.trim()
+    : null;
 }
 
-function knownPackageManager(value: string | undefined): RepoResponse["packageManager"] | null {
+function knownPackageManager(
+  value: string | undefined,
+): RepoResponse["packageManager"] | null {
   return value === "pnpm" || value === "npm" || value === "yarn" || value === "bun"
     ? value
     : null;
@@ -33,7 +37,10 @@ function detectedPackageManager(
   if (declared) return declared;
   if (existsSync(join(rootPath, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(rootPath, "yarn.lock"))) return "yarn";
-  if (existsSync(join(rootPath, "bun.lock")) || existsSync(join(rootPath, "bun.lockb")))
+  if (
+    existsSync(join(rootPath, "bun.lock")) ||
+    existsSync(join(rootPath, "bun.lockb"))
+  )
     return "bun";
   if (existsSync(join(rootPath, "package-lock.json"))) return "npm";
   return "unknown";
