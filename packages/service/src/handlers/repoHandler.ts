@@ -19,8 +19,17 @@ function gitValue(rootPath: string, args: readonly string[]): string | null {
   return result.status === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
 }
 
-function detectedPackageManager(rootPath: string, manifest: PackageManifest | null): string {
-  const declared = manifest?.packageManager?.split("@")[0];
+function knownPackageManager(value: string | undefined): RepoResponse["packageManager"] | null {
+  return value === "pnpm" || value === "npm" || value === "yarn" || value === "bun"
+    ? value
+    : null;
+}
+
+function detectedPackageManager(
+  rootPath: string,
+  manifest: PackageManifest | null,
+): RepoResponse["packageManager"] {
+  const declared = knownPackageManager(manifest?.packageManager?.split("@")[0]);
   if (declared) return declared;
   if (existsSync(join(rootPath, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(rootPath, "yarn.lock"))) return "yarn";
