@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
+    "lockfile:check": "pnpm install --lockfile-only --frozen-lockfile",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
