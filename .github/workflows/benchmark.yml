@@ -1,0 +1,108 @@
+name: Agent benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker:
+        description: "Worker preset"
+        required: true
+        default: "fixture"
+        type: choice
+        options:
+          - fixture
+          - codex
+          - claude-code
+          - aider
+          - openhands
+      suite:
+        description: "Benchmark suite ID"
+        required: true
+        default: "smoke"
+        type: string
+      repeat:
+        description: "Repetitions per case"
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - uses: actions/setup-python@v5
+        if: inputs.worker == 'aider' || inputs.worker == 'openhands'
+        with:
+          python-version: "3.12"
+
+      - name: Install repository dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build The Machine
+        run: pnpm build
+
+      - name: Install Codex CLI
+        if: inputs.worker == 'codex'
+        run: npm install --global @openai/codex@latest
+
+      - name: Install Claude Code
+        if: inputs.worker == 'claude-code'
+        run: npm install --global @anthropic-ai/claude-code@latest
+
+      - name: Install Aider
+        if: inputs.worker == 'aider'
+        run: python -m pip install --disable-pip-version-check aider-chat
+
+      - name: Install OpenHands
+        if: inputs.worker == 'openhands'
+        run: |
+          python -m pip install --disable-pip-version-check uv
+          uv tool install openhands --python 3.12
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Probe workers
+        run: node apps/cli/dist/index.js --json workers
+
+      - name: Run selected benchmark
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LLM_API_KEY: ${{ secrets.OPENHANDS_LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.OPENHANDS_LLM_MODEL }}
+          MACHINE_CODEX_MODEL: ${{ vars.MACHINE_CODEX_MODEL }}
+          MACHINE_CLAUDE_MODEL: ${{ vars.MACHINE_CLAUDE_MODEL }}
+          MACHINE_AIDER_MODEL: ${{ vars.MACHINE_AIDER_MODEL }}
+        run: >-
+          node tools/benchmark/benchmark.mjs
+          --suite "${{ inputs.suite }}"
+          --worker "${{ inputs.worker }}"
+          --repeat "${{ inputs.repeat }}"
+
+      - name: Upload raw and Markdown reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: machine-benchmark-${{ inputs.worker }}-${{ inputs.suite }}
+          path: benchmark-results/
+          if-no-files-found: warn
+          retention-days: 90
