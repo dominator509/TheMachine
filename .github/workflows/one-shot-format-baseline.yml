@@ -1,0 +1,59 @@
+name: One-shot Prettier baseline normalization
+
+on:
+  push:
+    branches:
+      - codex/agentic-runtime-kaizen-v1
+    paths:
+      - .github/workflows/one-shot-format-baseline.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: machine-one-shot-format-baseline
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.repository_owner == 'dominator509' && github.actor == 'dominator509'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - name: Install frozen workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Normalize every tracked Prettier surface
+        run: pnpm exec prettier --write .
+
+      - name: Verify the normalized baseline
+        run: pnpm exec prettier --check .
+
+      - name: Commit formatting only
+        run: |
+          if git diff --quiet; then
+            echo "Prettier baseline is already normalized."
+            exit 0
+          fi
+          git config user.name "The Machine CI"
+          git config user.email "ci@themachine.dev"
+          git add -A
+          git restore --staged pnpm-lock.yaml || true
+          git commit -m "style: establish repository Prettier baseline"
+          git pull --rebase origin codex/agentic-runtime-kaizen-v1
+          git push origin HEAD:codex/agentic-runtime-kaizen-v1
