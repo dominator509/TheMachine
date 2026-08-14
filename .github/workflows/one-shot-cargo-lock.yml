@@ -52,24 +52,61 @@ jobs:
       - name: Build native frontend
         run: pnpm --filter @the-machine/desktop build
 
-      - name: Generate deterministic Rust lockfile
-        run: cargo generate-lockfile --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Scope the cancellation mutex guard before returning
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/desktop/src-tauri/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          before = '''    child
+              .lock()
+              .map_err(|_| "job lock was poisoned".to_string())?
+              .kill()
+              .map_err(|error| format!("unable to terminate job: {error}"))
+          }'''
+          after = '''    let result = {
+              let mut locked_child = child
+                  .lock()
+                  .map_err(|_| "job lock was poisoned".to_string())?;
+              locked_child
+                  .kill()
+                  .map_err(|error| format!("unable to terminate job: {error}"))
+          };
+          result
+          }'''
+          if before not in text:
+              raise SystemExit("native cancellation block did not match the expected source")
+          path.write_text(text.replace(before, after, 1), encoding="utf-8")
+          PY
+
+      - name: Generate deterministic Rust lockfile and format native sources
+        run: |
+          cargo generate-lockfile --manifest-path apps/desktop/src-tauri/Cargo.toml
+          cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml
 
       - name: Verify native bridge against the generated lockfile
         run: |
           cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
           cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
           cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+          pnpm --filter @the-machine/desktop tauri build --no-bundle
 
-      - name: Commit Cargo.lock only after native verification passes
+      - name: Commit the verified native dependency graph
         run: |
-          if git diff --quiet -- apps/desktop/src-tauri/Cargo.lock; then
-            echo "Cargo.lock is already synchronized."
+          if git diff --quiet -- \
+            apps/desktop/src-tauri/Cargo.lock \
+            apps/desktop/src-tauri/build.rs \
+            apps/desktop/src-tauri/src/lib.rs; then
+            echo "Native sources and Cargo.lock are already synchronized."
             exit 0
           fi
           git config user.name "The Machine CI"
           git config user.email "ci@themachine.dev"
-          git add apps/desktop/src-tauri/Cargo.lock
-          git commit -m "chore(desktop): lock native Rust dependencies"
+          git add \
+            apps/desktop/src-tauri/Cargo.lock \
+            apps/desktop/src-tauri/build.rs \
+            apps/desktop/src-tauri/src/lib.rs
+          git commit -m "fix(desktop): verify native bridge and lock Rust dependencies"
           git pull --rebase origin codex/agentic-runtime-kaizen-v1
           git push origin HEAD:codex/agentic-runtime-kaizen-v1
