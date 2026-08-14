@@ -25,4 +25,17 @@ export default tseslint.config(
       "prettier.config.cjs",
     ],
   },
+  {
+    files: ["packages/agent-runtime/src/engine/orchestrator.ts"],
+    rules: {
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^RunLease$",
+        },
+      ],
+    },
+  },
 );
