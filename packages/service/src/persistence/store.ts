@@ -1,9 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import {
-  legacyCommandToSpec,
-  runSafeProcessSync,
-} from "@the-machine/agent-runtime";
+import { legacyCommandToSpec, runSafeProcessSync } from "@the-machine/agent-runtime";
 import type { ActivityStatus, EntityId, Priority, Severity } from "@the-machine/core";
 import {
   ALL_MIGRATIONS,
@@ -219,7 +216,9 @@ export class ServiceStore {
     const milestone = this.selectMilestone(planId, requestedMilestoneId);
     const runId = nowId("run");
     this.conn.db
-      .prepare("INSERT INTO agent_runs (id, execplan_id, milestone_id, status) VALUES (?, ?, ?, 'active')")
+      .prepare(
+        "INSERT INTO agent_runs (id, execplan_id, milestone_id, status) VALUES (?, ?, ?, 'active')",
+      )
       .run(runId, planId, milestone?.id ?? null);
 
     if (!milestone) {
@@ -274,7 +273,7 @@ export class ServiceStore {
     const started = Date.now();
     let exitCode = 1;
     let stdout = "";
-    let stderr = "";
+    let stderr: string;
     try {
       const spec = legacyCommandToSpec(milestone.validation_command, process.cwd());
       const result = runSafeProcessSync({
@@ -345,7 +344,9 @@ export class ServiceStore {
   }
 
   listRuns(): RunResponse[] {
-    const rows = this.conn.db.prepare("SELECT id FROM agent_runs ORDER BY created_at DESC").all() as {
+    const rows = this.conn.db
+      .prepare("SELECT id FROM agent_runs ORDER BY created_at DESC")
+      .all() as {
       id: string;
     }[];
     return rows
@@ -372,7 +373,9 @@ export class ServiceStore {
 
   listValidations(runId: EntityId): ValidationResponse[] {
     const rows = this.conn.db
-      .prepare("SELECT command, passed, exit_code, output, severity FROM validations WHERE run_id = ?")
+      .prepare(
+        "SELECT command, passed, exit_code, output, severity FROM validations WHERE run_id = ?",
+      )
       .all(runId) as {
       command: string;
       passed: number;
@@ -440,7 +443,9 @@ export class ServiceStore {
     }
     const remaining = (
       this.conn.db
-        .prepare("SELECT COUNT(*) AS count FROM milestones WHERE execplan_id = ? AND status != 'completed'")
+        .prepare(
+          "SELECT COUNT(*) AS count FROM milestones WHERE execplan_id = ? AND status != 'completed'",
+        )
         .get(planId) as CountRow
     ).count;
     this.markPlan(planId, remaining === 0 ? "completed" : "pending");

@@ -61,18 +61,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasUnsafeDisplayCharacter(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (character === "<" || character === ">" || code <= 0x1f) return true;
+  }
+  return false;
+}
+
 function safeDisplayText(value: unknown, maximumLength: number): value is string {
   return (
     typeof value === "string" &&
     value.length > 0 &&
     value.length <= maximumLength &&
-    !/[<>\u0000-\u001f]/.test(value)
+    !hasUnsafeDisplayCharacter(value)
   );
 }
 
 function validTheme(value: unknown): value is ThemeManifest {
   if (!isRecord(value)) return false;
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(String(value["name"] ?? ""))) return false;
+  const name = value["name"];
+  if (typeof name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name)) {
+    return false;
+  }
   for (const [key, maximum] of [
     ["label", 100],
     ["description", 500],
@@ -116,11 +127,7 @@ function requestHostAllowed(req: http.IncomingMessage, config: GuiServerConfig):
 
 function remoteIsLoopback(req: http.IncomingMessage): boolean {
   const address = req.socket.remoteAddress ?? "";
-  return (
-    address === "127.0.0.1" ||
-    address === "::1" ||
-    address === "::ffff:127.0.0.1"
-  );
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
 function originAllowed(req: http.IncomingMessage, config: GuiServerConfig): boolean {
@@ -136,7 +143,9 @@ function originAllowed(req: http.IncomingMessage, config: GuiServerConfig): bool
     return (
       parsed.protocol === "http:" &&
       actualPort === expectedPort &&
-      (config.allowRemote ? originHost === config.host.toLowerCase() : LOOPBACK_HOSTS.has(originHost))
+      (config.allowRemote
+        ? originHost === config.host.toLowerCase()
+        : LOOPBACK_HOSTS.has(originHost))
     );
   } catch {
     return false;
@@ -292,7 +301,9 @@ function allowedStaticPath(filePath: string, config: GuiServerConfig): boolean {
   ];
   return roots.some((root) => {
     const relativePath = path.relative(root, resolved);
-    return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+    return (
+      relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+    );
   });
 }
 
