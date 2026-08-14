@@ -11,10 +11,13 @@ export interface Workspace {
   readonly activeExecPlanId: EntityId | null;
 }
 
+/** Package managers that The Machine can identify without executing project code. */
+export type RepositoryPackageManager = "pnpm" | "npm" | "yarn" | "bun" | "unknown";
+
 /** Discovered repository metadata. */
 export interface RepositoryProfile {
   readonly rootPath: string;
-  readonly packageManager: "pnpm" | "npm" | "yarn" | "unknown";
+  readonly packageManager: RepositoryPackageManager;
   readonly nodeVersion: SemVer;
   readonly hasPackageJson: boolean;
   readonly hasGit: boolean;
