@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "id": "demo-agentic-run",
+  "title": "The Machine deterministic E2E demo",
+  "description": "A zero-credential smoke plan that proves worker execution, patch policy, validation, checkpointing, and evidence generation.",
+  "repository": {
+    "path": "../..",
+    "baseRef": "HEAD"
+  },
+  "workers": [
+    {
+      "id": "demo-worker",
+      "kind": "cli",
+      "executable": "node",
+      "args": [
+        "{workspace}/examples/workers/demo-worker.mjs",
+        "{workspace}"
+      ],
+      "timeoutMs": 30000,
+      "maxOutputBytes": 1048576
+    }
+  ],
+  "workerStrategy": {
+    "primary": "demo-worker"
+  },
+  "policy": {
+    "allowedPaths": [
+      "demo-output.txt"
+    ],
+    "deniedPaths": [
+      ".git/**",
+      ".machine/**"
+    ],
+    "maxChangedFiles": 1,
+    "maxPatchBytes": 10000,
+    "allowDependencyChanges": false,
+    "allowBinaryChanges": false,
+    "keepWorktree": true
+  },
+  "tasks": [
+    {
+      "id": "prove-agentic-loop",
+      "title": "Create and verify a worker artifact",
+      "objective": "Create demo-output.txt with the exact deterministic demonstration sentence.",
+      "allowedPaths": [
+        "demo-output.txt"
+      ],
+      "validations": [
+        {
+          "id": "demo-output-is-correct",
+          "executable": "node",
+          "args": [
+            "-e",
+            "const fs=require('node:fs');const expected='The Machine executed a worker in an isolated Git worktree.\\n';process.exit(fs.existsSync('demo-output.txt')&&fs.readFileSync('demo-output.txt','utf8')===expected?0:1)"
+          ],
+          "timeoutMs": 30000
+        }
+      ],
+      "maxAttempts": 2,
+      "requireChanges": true,
+      "approval": "none",
+      "checkpointMessage": "demo: prove The Machine agentic execution loop"
+    }
+  ],
+  "kaizen": {
+    "enabled": true,
+    "minimumOccurrences": 2
+  }
+}
