@@ -2,7 +2,7 @@ name: CI — The Machine
 
 on:
   push:
-    branches: [main, "codex/**"]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: machine-ci-${{ github.workflow }}-${{ github.ref }}
+  group: machine-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
