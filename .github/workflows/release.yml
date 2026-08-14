@@ -21,7 +21,7 @@ jobs:
   build:
     name: Build Release Candidate
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -32,14 +32,20 @@ jobs:
         with:
           node-version: "22.13.1"
 
-      - name: Enable pinned pnpm
-        run: corepack enable && corepack prepare pnpm@11.6.0 --activate
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Full verification
         run: ./scripts/verify.sh
+
+      - name: Benchmark smoke suite
+        run: pnpm run benchmark:smoke
 
       - name: Build release artifacts
         run: pnpm run build:release
@@ -58,9 +64,17 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ inputs.version }}
+          path: benchmark-results/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Dry-run result
         if: inputs.dry_run == 'true'
-        run: echo "Dry run complete — verification, release build, smoke, and readiness passed."
+        run: echo "Dry run complete — verification, benchmarks, release build, smoke, and readiness passed."
 
       - name: Validate release version
         if: inputs.dry_run == 'false'
