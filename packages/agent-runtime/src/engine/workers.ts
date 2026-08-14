@@ -55,9 +55,7 @@ export function buildWorkerPrompt(input: WorkerInput): string {
   const allowedPaths = input.task.allowedPaths?.join(", ") ?? "plan policy defaults";
   const deniedPaths = input.task.deniedPaths?.join(", ") ?? "plan policy defaults";
   const priorFailures = input.priorFailures.length
-    ? input.priorFailures
-        .map((failure) => `- ${failure.category}: ${failure.message}`)
-        .join("\n")
+    ? input.priorFailures.map((failure) => `- ${failure.category}: ${failure.message}`).join("\n")
     : "- none";
 
   return [
@@ -149,9 +147,7 @@ export function createCliWorker(config: CliWorkerConfig): MachineWorker {
         `${input.task.id}.attempt-${String(input.attempt)}.md`,
       );
       writeFileSync(promptFile, prompt, { encoding: "utf-8", mode: 0o600 });
-      const args = config.args.map((arg) =>
-        replacePlaceholders(arg, input, prompt, promptFile),
-      );
+      const args = config.args.map((arg) => replacePlaceholders(arg, input, prompt, promptFile));
       const environment = replaceEnvironmentPlaceholders(
         config.environment ?? {},
         input,
@@ -192,10 +188,7 @@ export function createCliWorker(config: CliWorkerConfig): MachineWorker {
       yield {
         type: "worker.completed",
         success:
-          result.exitCode === 0 &&
-          !result.cancelled &&
-          !result.timedOut &&
-          !result.truncated,
+          result.exitCode === 0 && !result.cancelled && !result.timedOut && !result.truncated,
         exitCode: result.exitCode,
         summary: `Worker '${config.id}' ${reason}.`,
       };

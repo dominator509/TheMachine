@@ -61,7 +61,8 @@ createServer((request, response) => {
   response.writeHead(200, {
     "content-type": MIME[extname(filePath)] ?? "application/octet-stream",
     "cache-control": "no-store",
-    "content-security-policy": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+    "content-security-policy":
+      "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
     "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",
   });

@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,26 +36,29 @@ function parseArguments(argv) {
     if (value === "--suite") options.suite = argv[++index] ?? options.suite;
     else if (value === "--worker") options.worker = argv[++index] ?? options.worker;
     else if (value === "--repeat") options.repeat = Number.parseInt(argv[++index] ?? "1", 10);
-    else if (value === "--output") options.output = resolve(argv[++index] ?? DEFAULT_OUTPUT_DIRECTORY);
+    else if (value === "--output")
+      options.output = resolve(argv[++index] ?? DEFAULT_OUTPUT_DIRECTORY);
     else if (value === "--json") options.json = true;
     else if (value === "--list") options.list = true;
     else if (value === "--keep") options.keep = true;
     else if (value === "--help" || value === "-h") {
-      console.log([
-        "The Machine public benchmark harness",
-        "",
-        "Usage:",
-        "  node tools/benchmark/benchmark.mjs [options]",
-        "",
-        "Options:",
-        "  --suite <id>       Benchmark suite (default: smoke)",
-        "  --worker <id>      fixture, codex, claude-code, aider, or openhands",
-        "  --repeat <n>       Repetitions per case (default: 1)",
-        "  --output <dir>     Report directory",
-        "  --list             List available suites",
-        "  --keep             Keep temporary repositories and worktrees",
-        "  --json             Print the complete report as JSON",
-      ].join("\n"));
+      console.log(
+        [
+          "The Machine public benchmark harness",
+          "",
+          "Usage:",
+          "  node tools/benchmark/benchmark.mjs [options]",
+          "",
+          "Options:",
+          "  --suite <id>       Benchmark suite (default: smoke)",
+          "  --worker <id>      fixture, codex, claude-code, aider, or openhands",
+          "  --repeat <n>       Repetitions per case (default: 1)",
+          "  --output <dir>     Report directory",
+          "  --list             List available suites",
+          "  --keep             Keep temporary repositories and worktrees",
+          "  --json             Print the complete report as JSON",
+        ].join("\n"),
+      );
       process.exit(0);
     } else {
       throw new Error(`Unknown benchmark option: ${value}`);
@@ -204,12 +215,15 @@ function selectedWorkerProbe(worker) {
     };
   }
   const payload = parseJsonOutput(result, "machine workers");
-  return payload.workers?.find((candidate) => candidate.id === worker) ?? {
-    id: worker,
-    available: worker === "fixture",
-    version: null,
-    message: worker === "fixture" ? "Deterministic benchmark fixture worker." : "Worker not registered.",
-  };
+  return (
+    payload.workers?.find((candidate) => candidate.id === worker) ?? {
+      id: worker,
+      available: worker === "fixture",
+      version: null,
+      message:
+        worker === "fixture" ? "Deterministic benchmark fixture worker." : "Worker not registered.",
+    }
+  );
 }
 
 function evidenceVerification(evidencePath) {
@@ -220,12 +234,22 @@ function evidenceVerification(evidencePath) {
     { cwd: ROOT, timeoutMs: 60_000 },
   );
   if (result.exitCode !== 0) {
-    return { valid: false, missing: [], mismatched: [result.stderr.trim() || "verification failed"] };
+    return {
+      valid: false,
+      missing: [],
+      mismatched: [result.stderr.trim() || "verification failed"],
+    };
   }
   return parseJsonOutput(result, "machine evidence verify");
 }
 
-function calculateScore({ completed, evidenceValid, expectedPathsChanged, policyViolations, attempts }) {
+function calculateScore({
+  completed,
+  evidenceValid,
+  expectedPathsChanged,
+  policyViolations,
+  attempts,
+}) {
   let score = 0;
   if (completed) score += 50;
   if (evidenceValid) score += 15;
@@ -277,7 +301,9 @@ function executeCase({ suite, benchmarkCase, worker, repetition, keep }) {
   const expectedPathsChanged = benchmarkCase.expectedChangedPaths.every((path) =>
     changedFiles.includes(path),
   );
-  const verification = evidenceVerification(outcome?.evidencePath ?? manifest?.evidencePath ?? null);
+  const verification = evidenceVerification(
+    outcome?.evidencePath ?? manifest?.evidencePath ?? null,
+  );
   const completed = outcome?.status === "completed" && manifest?.status === "completed";
   const policyViolations = manifest?.metrics?.policyViolationCount ?? 0;
   const attempts = taskState?.attempts?.length ?? 0;
@@ -323,8 +349,9 @@ function executeCase({ suite, benchmarkCase, worker, repetition, keep }) {
 }
 
 function markdownReport(report) {
-  const rows = report.results.map((result) =>
-    `| ${result.caseId} | ${result.repetition} | ${result.passed ? "PASS" : "FAIL"} | ${result.score} | ${result.attempts} | ${result.elapsedMs} | ${result.changedFiles.join(", ") || "—"} |`,
+  const rows = report.results.map(
+    (result) =>
+      `| ${result.caseId} | ${result.repetition} | ${result.passed ? "PASS" : "FAIL"} | ${result.score} | ${result.attempts} | ${result.elapsedMs} | ${result.changedFiles.join(", ") || "—"} |`,
   );
   return [
     `# The Machine benchmark — ${report.suite.id} / ${report.worker.id}`,
@@ -355,7 +382,9 @@ function markdownReport(report) {
 }
 
 function mean(values) {
-  return values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length;
+  return values.length === 0
+    ? 0
+    : values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function main() {
@@ -365,7 +394,11 @@ function main() {
       const suite = JSON.parse(readFileSync(join(SUITES_DIRECTORY, name), "utf-8"));
       return { id: suite.id, title: suite.title, cases: suite.cases.length, file: name };
     });
-    console.log(options.json ? JSON.stringify({ suites }, null, 2) : suites.map((suite) => `${suite.id}\t${suite.cases}\t${suite.title}`).join("\n"));
+    console.log(
+      options.json
+        ? JSON.stringify({ suites }, null, 2)
+        : suites.map((suite) => `${suite.id}\t${suite.cases}\t${suite.title}`).join("\n"),
+    );
     return;
   }
   if (!existsSync(CLI_ENTRY)) {
@@ -373,19 +406,22 @@ function main() {
   }
 
   const suite = readSuite(options.suite);
-  const workerProbe = options.worker === "fixture"
-    ? {
-        id: "fixture",
-        available: true,
-        version: "deterministic-v1",
-        message: "Credential-free deterministic benchmark worker.",
-      }
-    : selectedWorkerProbe(options.worker);
+  const workerProbe =
+    options.worker === "fixture"
+      ? {
+          id: "fixture",
+          available: true,
+          version: "deterministic-v1",
+          message: "Credential-free deterministic benchmark worker.",
+        }
+      : selectedWorkerProbe(options.worker);
   const results = [];
   for (let repetition = 1; repetition <= options.repeat; repetition += 1) {
     for (const benchmarkCase of suite.cases) {
       if (!options.json) {
-        console.log(`[benchmark] ${benchmarkCase.id} / ${options.worker} / repetition ${String(repetition)}`);
+        console.log(
+          `[benchmark] ${benchmarkCase.id} / ${options.worker} / repetition ${String(repetition)}`,
+        );
       }
       results.push(
         executeCase({
@@ -399,7 +435,8 @@ function main() {
     }
   }
 
-  const machineCommit = command("git", ["rev-parse", "HEAD"], { cwd: ROOT }).stdout.trim() || "unknown";
+  const machineCommit =
+    command("git", ["rev-parse", "HEAD"], { cwd: ROOT }).stdout.trim() || "unknown";
   const report = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -439,12 +476,19 @@ function main() {
   const markdownPath = join(options.output, `${stem}.md`);
   writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
   writeFileSync(markdownPath, `${markdownReport(report)}\n`, "utf-8");
-  writeFileSync(join(options.output, "latest.json"), `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+  writeFileSync(
+    join(options.output, "latest.json"),
+    `${JSON.stringify(report, null, 2)}\n`,
+    "utf-8",
+  );
   writeFileSync(join(options.output, "latest.md"), `${markdownReport(report)}\n`, "utf-8");
 
-  if (options.json) console.log(JSON.stringify({ ...report, reportFiles: { jsonPath, markdownPath } }, null, 2));
+  if (options.json)
+    console.log(JSON.stringify({ ...report, reportFiles: { jsonPath, markdownPath } }, null, 2));
   else {
-    console.log(`\n[benchmark] ${String(report.summary.passed)}/${String(report.summary.total)} passed`);
+    console.log(
+      `\n[benchmark] ${String(report.summary.passed)}/${String(report.summary.total)} passed`,
+    );
     console.log(`[benchmark] mean score ${report.summary.meanScore.toFixed(2)}`);
     console.log(`[benchmark] JSON ${jsonPath}`);
     console.log(`[benchmark] Markdown ${markdownPath}`);

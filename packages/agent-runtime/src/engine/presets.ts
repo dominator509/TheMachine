@@ -189,7 +189,8 @@ const DEFINITIONS: readonly PresetDefinition[] = [
     descriptor: {
       id: "codex",
       displayName: "OpenAI Codex CLI",
-      description: "Runs Codex noninteractively with automatic review and a workspace-write sandbox.",
+      description:
+        "Runs Codex noninteractively with automatic review and a workspace-write sandbox.",
       kind: "codex-cli",
       builtIn: true,
       documentationUrl: "https://github.com/openai/codex",
@@ -296,7 +297,8 @@ const DEFINITIONS: readonly PresetDefinition[] = [
     descriptor: {
       id: "aider",
       displayName: "Aider",
-      description: "Runs one scripted Aider edit pass while disabling Aider-owned commits and test execution.",
+      description:
+        "Runs one scripted Aider edit pass while disabling Aider-owned commits and test execution.",
       kind: "aider-cli",
       builtIn: true,
       documentationUrl: "https://aider.chat/docs/scripting.html",
@@ -348,7 +350,8 @@ const DEFINITIONS: readonly PresetDefinition[] = [
     descriptor: {
       id: "openhands",
       displayName: "OpenHands",
-      description: "Runs the OpenHands CLI headlessly with JSONL events and only the disposable worktree mounted writable.",
+      description:
+        "Runs the OpenHands CLI headlessly with JSONL events and only the disposable worktree mounted writable.",
       kind: "openhands-cli",
       builtIn: true,
       documentationUrl: "https://docs.openhands.dev/openhands/usage/cli/headless",
@@ -402,7 +405,9 @@ export function describeWorker(worker: MachineWorker): WorkerDescriptor {
     supportedPlatforms: ["linux", "darwin", "win32"],
     requiredEnvironment: [],
     optionalEnvironment: [],
-    safetyNotes: ["Custom workers are responsible for declaring and enforcing their own execution boundary."],
+    safetyNotes: [
+      "Custom workers are responsible for declaring and enforcing their own execution boundary.",
+    ],
   };
 }
 

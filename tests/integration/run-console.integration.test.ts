@@ -106,7 +106,9 @@ describe("shared native run-console snapshot", () => {
     expect(snapshot.plan.id).toBe("console-fixture");
     expect(snapshot.events.some((event) => event.type === "run.completed")).toBe(true);
     expect(snapshot.diff).toContain("result.txt");
-    expect(snapshot.artifacts.some((artifact) => artifact.path === "evidence/manifest.json")).toBe(true);
+    expect(snapshot.artifacts.some((artifact) => artifact.path === "evidence/manifest.json")).toBe(
+      true,
+    );
     expect(snapshot.evidenceVerification?.valid).toBe(true);
     expect(existsSync(snapshot.manifest.evidencePath as string)).toBe(true);
   });

@@ -1,19 +1,9 @@
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { verifyEvidenceBundle, type EvidenceVerification } from "./evidence.js";
 import { diffFromBase, getRepositoryRoot } from "./git.js";
 import { RunStateStore } from "./state.js";
-import type {
-  ApprovalRecord,
-  MachinePlan,
-  RunEvent,
-  RunManifest,
-} from "./types.js";
+import type { ApprovalRecord, MachinePlan, RunEvent, RunManifest } from "./types.js";
 
 export interface RunArtifact {
   readonly path: string;
@@ -103,9 +93,10 @@ export function loadRunConsoleSnapshot(
 ): RunConsoleSnapshot {
   const store = storeFor(repositoryPath, stateRoot);
   const manifest = store.loadManifest(runId);
-  const evidenceVerification = manifest.evidencePath && existsSync(manifest.evidencePath)
-    ? verifyEvidenceBundle(manifest.evidencePath)
-    : null;
+  const evidenceVerification =
+    manifest.evidencePath && existsSync(manifest.evidencePath)
+      ? verifyEvidenceBundle(manifest.evidencePath)
+      : null;
   return {
     manifest,
     plan: store.loadPlanSnapshot(runId),

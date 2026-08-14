@@ -55,10 +55,14 @@ function showHelp(): void {
   console.log("");
   console.log("Agentic execution:");
   console.log("  plan:validate <plan.machine.json>       Compile and validate an immutable plan");
-  console.log("  run <plan.machine.json>                 Execute a plan in an isolated Git worktree");
+  console.log(
+    "  run <plan.machine.json>                 Execute a plan in an isolated Git worktree",
+  );
   console.log("  resume <run-id> [repository]            Resume from the last durable checkpoint");
   console.log("  status <run-id> [repository]            Show a durable run manifest");
-  console.log("  snapshot <run-id> [repository] [seq]    Load console state, events, diff, and artifacts");
+  console.log(
+    "  snapshot <run-id> [repository] [seq]    Load console state, events, diff, and artifacts",
+  );
   console.log("  runs [repository]                       List local runs");
   console.log("  logs <run-id> [repository]              Show the append-only event stream");
   console.log("  diff <run-id> [repository]              Show the run patch from its base commit");
@@ -66,7 +70,9 @@ function showHelp(): void {
   console.log("  cancel <run-id> [repository] [reason]   Request cooperative cancellation");
   console.log("  approve <run-id> <task> <phase> [...]   Approve a before/after task gate");
   console.log("  reject <run-id> <task> <phase> [...]    Reject a before/after task gate");
-  console.log("  workers [plan.machine.json]              Probe built-ins and inspect plan workers");
+  console.log(
+    "  workers [plan.machine.json]              Probe built-ins and inspect plan workers",
+  );
   console.log("  evidence verify <directory>             Verify SHA-256 evidence integrity");
   console.log("");
   console.log("Public benchmark harness:");
@@ -152,11 +158,7 @@ function showRunStatus(runId: string, repository: string, jsonMode: boolean): vo
   output(jsonMode ? manifest : manifestText(manifest), jsonMode);
 }
 
-function runSnapshot(
-  runId: string,
-  repository: string,
-  afterSequence: number,
-): RunConsoleSnapshot {
+function runSnapshot(runId: string, repository: string, afterSequence: number): RunConsoleSnapshot {
   return loadRunConsoleSnapshot(runId, resolve(repository), undefined, afterSequence);
 }
 
@@ -254,7 +256,9 @@ async function inspectWorkers(planPath: string | undefined, jsonMode: boolean): 
       console.log("");
       console.log(`Plan: ${compiled.plan.id}`);
       console.log(`Primary: ${compiled.plan.workerStrategy.primary}`);
-      console.log(`Fallbacks: ${(compiled.plan.workerStrategy.fallbacks ?? []).join(", ") || "none"}`);
+      console.log(
+        `Fallbacks: ${(compiled.plan.workerStrategy.fallbacks ?? []).join(", ") || "none"}`,
+      );
     }
   }
 }
@@ -370,8 +374,7 @@ function handleKaizen(args: readonly string[], jsonMode: boolean): void {
   } else if (action === "record") {
     const runId = args[3];
     const recordRepository = args[4] ?? CWD;
-    if (!runId)
-      throw new Error("Usage: machine kaizen record <proposal-id> <run-id> [repository]");
+    if (!runId) throw new Error("Usage: machine kaizen record <proposal-id> <run-id> [repository]");
     const proposal = agentic.kaizen(resolve(recordRepository)).recordValidation(id, runId);
     output(jsonMode ? proposal : kaizenText(proposal), jsonMode);
   } else {
@@ -475,7 +478,7 @@ function showProvider(id: string, jsonMode: boolean): void {
   });
   output(
     jsonMode
-      ? provider ?? { error: "Not found" }
+      ? (provider ?? { error: "Not found" })
       : provider
         ? `Provider: ${provider.id}\nName: ${provider.name}\nTier: ${provider.tier}\nEndpoint: ${provider.endpoint}\nHealthy: ${provider.healthy ? "true" : "false"}`
         : `Provider '${id}' not found.`,
@@ -488,16 +491,14 @@ function showMcp(jsonMode: boolean): void {
   if (jsonMode) output(servers, true);
   else if (servers.length === 0) console.log("No MCP servers registered.");
   else
-    servers.forEach((server) =>
-      console.log(`${server.id} — ${server.name} (${server.transport})`),
-    );
+    servers.forEach((server) => console.log(`${server.id} — ${server.name} (${server.transport})`));
 }
 
 function showMcpServer(id: string, jsonMode: boolean): void {
   const server = client().mcp.get({ workspaceId: DEFAULT_WS_ID, mcpId: id as EntityId });
   output(
     jsonMode
-      ? server ?? { error: "Not found" }
+      ? (server ?? { error: "Not found" })
       : server
         ? `MCP server: ${server.id}\nName: ${server.name}\nTransport: ${server.transport}\nEndpoint: ${server.endpoint}\nTools: ${String(server.tools.length)}`
         : `MCP server '${id}' not found.`,
@@ -519,7 +520,7 @@ function showPlugin(id: string, jsonMode: boolean): void {
   });
   output(
     jsonMode
-      ? plugin ?? { error: "Not found" }
+      ? (plugin ?? { error: "Not found" })
       : plugin
         ? `Plugin: ${plugin.id}\nName: ${plugin.name}\nVersion: ${plugin.version}\nEnabled: ${plugin.enabled ? "true" : "false"}`
         : `Plugin '${id}' not found.`,
@@ -589,9 +590,7 @@ function showGuiThemes(jsonMode: boolean): void {
   const themes = listThemes();
   if (jsonMode) output({ themes }, true);
   else
-    themes.forEach((theme) =>
-      console.log(`${theme.name} — ${theme.label}: ${theme.description}`),
-    );
+    themes.forEach((theme) => console.log(`${theme.name} — ${theme.label}: ${theme.description}`));
 }
 
 async function main(): Promise<void> {
@@ -601,7 +600,7 @@ async function main(): Promise<void> {
   const args = rawArgs.filter(
     (argument) => argument !== "--json" && argument !== "--help" && argument !== "-h",
   );
-  const command = helpRequested ? "help" : args[0] ?? "help";
+  const command = helpRequested ? "help" : (args[0] ?? "help");
 
   switch (command) {
     case "help":
@@ -627,7 +626,8 @@ async function main(): Promise<void> {
       showRunStatus(args[1], args[2] ?? CWD, jsonMode);
       break;
     case "snapshot": {
-      if (!args[1]) throw new Error("Usage: machine snapshot <run-id> [repository] [after-sequence]");
+      if (!args[1])
+        throw new Error("Usage: machine snapshot <run-id> [repository] [after-sequence]");
       const sequence = args[3] ? Number.parseInt(args[3], 10) : 0;
       if (!Number.isInteger(sequence) || sequence < 0)
         throw new Error("after-sequence must be a non-negative integer.");

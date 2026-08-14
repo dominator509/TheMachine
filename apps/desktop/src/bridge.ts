@@ -71,8 +71,6 @@ export async function cancelDesktopJob(jobId: string): Promise<void> {
   await invoke("machine_cancel_job", { jobId });
 }
 
-export async function onMachineJobEvent(
-  handler: (event: JobEvent) => void,
-): Promise<UnlistenFn> {
+export async function onMachineJobEvent(handler: (event: JobEvent) => void): Promise<UnlistenFn> {
   return await listen<JobEvent>("machine-job-event", (event) => handler(event.payload));
 }

@@ -30,9 +30,21 @@
             <span class="section-kicker">Local</span>
           </div>
           <label class="field-label" for="repository-input">Repository</label>
-          <input id="repository-input" class="text-input" type="text" spellcheck="false" placeholder="/path/to/repository" />
+          <input
+            id="repository-input"
+            class="text-input"
+            type="text"
+            spellcheck="false"
+            placeholder="/path/to/repository"
+          />
           <label class="field-label" for="plan-input">Machine plan</label>
-          <input id="plan-input" class="text-input" type="text" spellcheck="false" placeholder="/path/to/plan.machine.json" />
+          <input
+            id="plan-input"
+            class="text-input"
+            type="text"
+            spellcheck="false"
+            placeholder="/path/to/plan.machine.json"
+          />
           <div class="button-row">
             <button id="start-button" class="button primary" type="button">Start run</button>
             <button id="probe-button" class="button secondary" type="button">Probe</button>
@@ -75,7 +87,9 @@
           <div id="no-run" class="empty-state hero-empty">
             <div class="empty-icon" aria-hidden="true">◎</div>
             <h2>No run selected</h2>
-            <p>Select a durable run from the left rail, or start a plan in an isolated Git worktree.</p>
+            <p>
+              Select a durable run from the left rail, or start a plan in an isolated Git worktree.
+            </p>
           </div>
 
           <div id="run-detail" class="run-detail hidden">
@@ -101,7 +115,12 @@
                 <p id="approval-description" class="muted"></p>
               </div>
               <div class="approval-controls">
-                <input id="approval-note" class="text-input" type="text" placeholder="Decision note" />
+                <input
+                  id="approval-note"
+                  class="text-input"
+                  type="text"
+                  placeholder="Decision note"
+                />
                 <button id="approve-button" class="button success" type="button">Approve</button>
                 <button id="reject-button" class="button danger" type="button">Reject</button>
               </div>
@@ -111,7 +130,9 @@
               <button class="detail-tab active" type="button" data-detail-tab="tasks">Tasks</button>
               <button class="detail-tab" type="button" data-detail-tab="events">Events</button>
               <button class="detail-tab" type="button" data-detail-tab="diff">Diff</button>
-              <button class="detail-tab" type="button" data-detail-tab="artifacts">Artifacts</button>
+              <button class="detail-tab" type="button" data-detail-tab="artifacts">
+                Artifacts
+              </button>
               <button class="detail-tab" type="button" data-detail-tab="plan">Plan</button>
             </div>
 
@@ -121,7 +142,8 @@
             <section class="detail-panel" data-detail-panel="events">
               <div class="panel-toolbar">
                 <span id="event-count" class="muted">0 events</span>
-                <label class="inline-field">Level
+                <label class="inline-field"
+                  >Level
                   <select id="event-filter" class="compact-select">
                     <option value="all">All</option>
                     <option value="worker">Worker</option>
@@ -139,7 +161,9 @@
             </section>
             <section class="detail-panel" data-detail-panel="artifacts">
               <div class="panel-toolbar">
-                <button id="verify-evidence-button" class="button secondary" type="button">Verify evidence</button>
+                <button id="verify-evidence-button" class="button secondary" type="button">
+                  Verify evidence
+                </button>
                 <span id="evidence-status" class="muted"></span>
               </div>
               <div id="artifact-list" class="artifact-list"></div>
@@ -155,9 +179,13 @@
             <div>
               <div class="eyebrow">Execution adapters</div>
               <h2>First-class workers</h2>
-              <p class="muted">Version-probed, noninteractive presets with explicit environment and safety posture.</p>
+              <p class="muted">
+                Version-probed, noninteractive presets with explicit environment and safety posture.
+              </p>
             </div>
-            <button id="probe-workers-button" class="button primary" type="button">Probe all</button>
+            <button id="probe-workers-button" class="button primary" type="button">
+              Probe all
+            </button>
           </div>
           <div id="worker-grid" class="worker-grid"></div>
         </section>
@@ -167,7 +195,10 @@
             <div>
               <div class="eyebrow">Reproducible evaluation</div>
               <h2>Public benchmark harness</h2>
-              <p class="muted">Fresh temporary repositories, deterministic validations, scope scoring, and checksum-verified evidence.</p>
+              <p class="muted">
+                Fresh temporary repositories, deterministic validations, scope scoring, and
+                checksum-verified evidence.
+              </p>
             </div>
           </div>
           <div class="benchmark-layout">
@@ -183,15 +214,26 @@
                 <option value="openhands">OpenHands</option>
               </select>
               <label class="field-label" for="benchmark-repeat">Repetitions</label>
-              <input id="benchmark-repeat" class="text-input" type="number" min="1" max="25" value="1" />
-              <button id="benchmark-run-button" class="button primary" type="submit">Run benchmark</button>
+              <input
+                id="benchmark-repeat"
+                class="text-input"
+                type="number"
+                min="1"
+                max="25"
+                value="1"
+              />
+              <button id="benchmark-run-button" class="button primary" type="submit">
+                Run benchmark
+              </button>
             </form>
             <div class="benchmark-report">
               <div class="section-heading">
                 <span>Latest job</span>
                 <span id="benchmark-status" class="status-pill neutral">Idle</span>
               </div>
-              <div id="benchmark-summary" class="empty-state compact">Run the fixture worker for a credential-free baseline, or select an installed agent.</div>
+              <div id="benchmark-summary" class="empty-state compact">
+                Run the fixture worker for a credential-free baseline, or select an installed agent.
+              </div>
             </div>
           </div>
         </section>
@@ -204,7 +246,9 @@
         </div>
         <div id="job-meta" class="job-meta muted">No background job.</div>
         <pre id="job-console" class="job-console" aria-live="polite"></pre>
-        <button id="stop-job-button" class="button danger full hidden" type="button">Stop desktop job</button>
+        <button id="stop-job-button" class="button danger full hidden" type="button">
+          Stop desktop job
+        </button>
       </aside>
     </div>
 

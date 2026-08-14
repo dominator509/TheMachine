@@ -17,18 +17,15 @@ function safeWrite(relativePath, contents) {
 
 switch (taskId) {
   case "fix-addition":
-    safeWrite(
-      "src/math.mjs",
-      "export function add(a, b) {\n  return a + b;\n}\n",
-    );
+    safeWrite("src/math.mjs", "export function add(a, b) {\n  return a + b;\n}\n");
     break;
   case "normalize-greeting":
     safeWrite(
       "src/greeting.mjs",
       [
         "export function normalizeGreeting(value) {",
-        "  const normalized = String(value).trim().replace(/\\s+/g, \" \" ).replace(/!+$/g, \"\");",
-        "  if (normalized.length === 0) return \"!\";",
+        '  const normalized = String(value).trim().replace(/\\s+/g, " " ).replace(/!+$/g, "");',
+        '  if (normalized.length === 0) return "!";',
         "  return `${normalized[0].toUpperCase()}${normalized.slice(1)}!`;",
         "}",
         "",

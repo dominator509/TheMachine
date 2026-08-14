@@ -122,7 +122,11 @@ fn machine_command() -> Result<MachineCommand, String> {
 
     let current = env::current_dir().map_err(|error| error.to_string())?;
     for ancestor in current.ancestors() {
-        let candidate = ancestor.join("apps").join("cli").join("dist").join("index.js");
+        let candidate = ancestor
+            .join("apps")
+            .join("cli")
+            .join("dist")
+            .join("index.js");
         if candidate.is_file() {
             let node = env::var("MACHINE_NODE").unwrap_or_else(|_| "node".to_string());
             return Ok(MachineCommand {
@@ -133,7 +137,11 @@ fn machine_command() -> Result<MachineCommand, String> {
     }
 
     Ok(MachineCommand {
-        executable: PathBuf::from(if cfg!(windows) { "machine.cmd" } else { "machine" }),
+        executable: PathBuf::from(if cfg!(windows) {
+            "machine.cmd"
+        } else {
+            "machine"
+        }),
         prefix_args: Vec::new(),
     })
 }
@@ -320,7 +328,7 @@ fn machine_launch(
     request: MachineRequest,
 ) -> Result<String, String> {
     if !matches!(
-        request,
+        &request,
         MachineRequest::Start { .. }
             | MachineRequest::Resume { .. }
             | MachineRequest::Benchmark { .. }
@@ -333,8 +341,14 @@ fn machine_launch(
     let mut child = command
         .spawn()
         .map_err(|error| format!("unable to launch The Machine job: {error}"))?;
-    let stdout = child.stdout.take().ok_or_else(|| "job stdout was not piped".to_string())?;
-    let stderr = child.stderr.take().ok_or_else(|| "job stderr was not piped".to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "job stdout was not piped".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "job stderr was not piped".to_string())?;
     let job_id = new_job_id();
     let shared_child = Arc::new(Mutex::new(child));
     registry
@@ -346,7 +360,6 @@ fn machine_launch(
     emit_reader(app.clone(), job_id.clone(), "stdout", stdout);
     emit_reader(app.clone(), job_id.clone(), "stderr", stderr);
 
-    let monitor_registry = registry.inner().clone();
     let monitor_job_id = job_id.clone();
     thread::spawn(move || loop {
         let status = match shared_child.lock() {
@@ -404,7 +417,12 @@ fn machine_launch(
             .lock()
             .ok()
             .and_then(|jobs| jobs.get(&cleanup_job_id).cloned())
-            .and_then(|child| child.lock().ok().and_then(|mut child| child.try_wait().ok().flatten()))
+            .and_then(|child| {
+                child
+                    .lock()
+                    .ok()
+                    .and_then(|mut child| child.try_wait().ok().flatten())
+            })
             .is_some();
         if finished {
             if let Ok(mut jobs) = cleanup_registry.jobs.lock() {
@@ -418,10 +436,7 @@ fn machine_launch(
 }
 
 #[tauri::command]
-fn machine_cancel_job(
-    registry: State<'_, Arc<JobRegistry>>,
-    job_id: String,
-) -> Result<(), String> {
+fn machine_cancel_job(registry: State<'_, Arc<JobRegistry>>, job_id: String) -> Result<(), String> {
     let child = registry
         .jobs
         .lock()
@@ -465,13 +480,7 @@ mod tests {
         .expect("snapshot arguments");
         assert_eq!(
             args,
-            vec![
-                "--json",
-                "snapshot",
-                "run-1",
-                "/tmp/repository",
-                "7"
-            ]
+            vec!["--json", "snapshot", "run-1", "/tmp/repository", "7"]
         );
     }
 

@@ -32,14 +32,30 @@ const AGENT_NAMES: Readonly<Record<number, string>> = {
 
 /** Default station assignment per agent — mirrors PANTAW's DEFAULT_STATION_BY_AGENT. */
 const DEFAULT_STATION: Readonly<Record<number, string>> = {
-  1: "planning", 2: "planning", 3: "planning", 4: "planning",
-  5: "coding", 6: "code-review", 7: "coding",
-  8: "planning", 9: "planning", 10: "kaizen",
-  11: "qa-testing", 12: "deploy", 13: "coding",
-  14: "security-scan", 15: "coding", 16: "qa-testing",
-  17: "planning", 18: "planning",
-  19: "gate-clear", 20: "gate-clear", 21: "takt",
-  22: "kaizen", 23: "kaizen", 24: "dependency-check",
+  1: "planning",
+  2: "planning",
+  3: "planning",
+  4: "planning",
+  5: "coding",
+  6: "code-review",
+  7: "coding",
+  8: "planning",
+  9: "planning",
+  10: "kaizen",
+  11: "qa-testing",
+  12: "deploy",
+  13: "coding",
+  14: "security-scan",
+  15: "coding",
+  16: "qa-testing",
+  17: "planning",
+  18: "planning",
+  19: "gate-clear",
+  20: "gate-clear",
+  21: "takt",
+  22: "kaizen",
+  23: "kaizen",
+  24: "dependency-check",
 };
 
 export type GuiEventType = "start" | "progress" | "complete" | "victory" | "andon" | "blocker";
@@ -57,11 +73,24 @@ export type GuiStation =
   | "dependency-check";
 
 const VALID_EVENT_TYPES = new Set<string>([
-  "start", "progress", "complete", "victory", "andon", "blocker",
+  "start",
+  "progress",
+  "complete",
+  "victory",
+  "andon",
+  "blocker",
 ]);
 const VALID_STATIONS = new Set<string>([
-  "planning", "coding", "code-review", "qa-testing", "security-scan",
-  "deploy", "gate-clear", "kaizen", "takt", "dependency-check",
+  "planning",
+  "coding",
+  "code-review",
+  "qa-testing",
+  "security-scan",
+  "deploy",
+  "gate-clear",
+  "kaizen",
+  "takt",
+  "dependency-check",
 ]);
 
 /** Payload sent to the GUI webhook. */
@@ -138,9 +167,7 @@ function cleanInput(
   const message = (input.message ?? "").substring(0, 240);
   const theme = input.theme ?? defaultTheme;
   const metrics =
-    input.metrics &&
-    typeof input.metrics === "object" &&
-    !Array.isArray(input.metrics)
+    input.metrics && typeof input.metrics === "object" && !Array.isArray(input.metrics)
       ? input.metrics
       : {};
 
@@ -160,12 +187,7 @@ function cleanInput(
   };
 }
 
-function logFallback(
-  event: GuiEvent,
-  errors: string[],
-  webhookUrl: string,
-  reason: string,
-): void {
+function logFallback(event: GuiEvent, errors: string[], webhookUrl: string, reason: string): void {
   console.log(
     `[PANTAW-EMIT FALLBACK] Frontend webhook unreachable at ${webhookUrl} — reason: ${reason}`,
   );
@@ -181,7 +203,9 @@ async function postEvent(
   timeoutMs: number,
 ): Promise<{ ok: boolean; reason: string }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => { controller.abort(); }, timeoutMs);
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await fetch(webhookUrl, {
@@ -230,15 +254,10 @@ async function postEvent(
  *     metrics: { execPlan: 'EP-002', milestone: 'M4' },
  *   });
  */
-export function emitToGUI(
-  input: GuiEventInput,
-  config?: EmitConfig,
-): GuiEvent {
+export function emitToGUI(input: GuiEventInput, config?: EmitConfig): GuiEvent {
   const webhookUrl =
     config?.webhookUrl ??
-    (typeof process !== "undefined"
-      ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"]
-      : undefined) ??
+    (typeof process !== "undefined" ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"] : undefined) ??
     "http://localhost:3000/api/pipeline-event";
 
   const timeout = config?.timeout ?? 2000;
@@ -275,9 +294,7 @@ export async function emitToGUIAsync(
 }> {
   const webhookUrl =
     config?.webhookUrl ??
-    (typeof process !== "undefined"
-      ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"]
-      : undefined) ??
+    (typeof process !== "undefined" ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"] : undefined) ??
     "http://localhost:3000/api/pipeline-event";
 
   const timeout = config?.timeout ?? 2000;
@@ -290,13 +307,14 @@ export async function emitToGUIAsync(
     if (!result.ok) {
       logFallback(event, errors, webhookUrl, result.reason);
     }
-    const out: { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[] } = {
-      success: result.ok,
-      event,
-      validationErrors: errors,
-    };
+    const out: { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[] } =
+      {
+        success: result.ok,
+        event,
+        validationErrors: errors,
+      };
     if (!result.ok) out.reason = result.reason;
-    return out as { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[]; };
+    return out;
   } catch (err: unknown) {
     const reason = (err instanceof Error ? err.message : String(err)).substring(0, 200);
     logFallback(event, errors, webhookUrl, reason);

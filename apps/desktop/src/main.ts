@@ -259,7 +259,8 @@ function setPill(target: HTMLElement, label: string, status: string): void {
 }
 
 function formatDuration(milliseconds: number | null | undefined): string {
-  if (milliseconds === null || milliseconds === undefined || !Number.isFinite(milliseconds)) return "—";
+  if (milliseconds === null || milliseconds === undefined || !Number.isFinite(milliseconds))
+    return "—";
   if (milliseconds < 1000) return `${String(milliseconds)} ms`;
   if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(1)} s`;
   const minutes = Math.floor(milliseconds / 60_000);
@@ -287,7 +288,9 @@ function shortId(value: string | null | undefined, length = 12): string {
 async function queryJson<T>(request: MachineRequest): Promise<T> {
   const result = await queryMachine<T>(request);
   if (result.exit_code !== 0) {
-    throw new Error(result.stderr.trim() || result.stdout.trim() || `Machine exited ${String(result.exit_code)}`);
+    throw new Error(
+      result.stderr.trim() || result.stdout.trim() || `Machine exited ${String(result.exit_code)}`,
+    );
   }
   if (result.json === null) throw new Error("The Machine CLI did not return structured JSON.");
   return result.json;
@@ -319,7 +322,10 @@ function renderRuns(): void {
   if (visible.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state compact";
-    empty.textContent = state.runs.length === 0 ? "No durable runs in this repository." : "No runs match this filter.";
+    empty.textContent =
+      state.runs.length === 0
+        ? "No durable runs in this repository."
+        : "No runs match this filter.";
     ui.runList.append(empty);
     return;
   }
@@ -351,7 +357,8 @@ function taskProgress(stateValue: TaskState): HTMLElement {
   const progress = document.createElement("div");
   progress.className = "task-progress";
   const steps = ["pending", "working", "validating", "checkpointing", "completed"];
-  const phaseIndex = stateValue.status === "completed" ? 4 : Math.max(0, steps.indexOf(stateValue.phase));
+  const phaseIndex =
+    stateValue.status === "completed" ? 4 : Math.max(0, steps.indexOf(stateValue.phase));
   steps.forEach((_step, index) => {
     const segment = document.createElement("span");
     if (index <= phaseIndex && stateValue.status !== "failed") segment.className = "complete";
@@ -417,7 +424,9 @@ function eventSummary(event: RunEvent): string {
 
 function renderEvents(snapshot: RunSnapshot): void {
   const filter = ui.eventFilter.value;
-  const events = snapshot.events.filter((event) => filter === "all" || eventCategory(event.type) === filter);
+  const events = snapshot.events.filter(
+    (event) => filter === "all" || eventCategory(event.type) === filter,
+  );
   ui.eventCount.textContent = `${String(snapshot.events.length)} events`;
   ui.eventList.replaceChildren();
   if (events.length === 0) {
@@ -471,7 +480,8 @@ function renderArtifacts(snapshot: RunSnapshot): void {
   const verification = snapshot.evidenceVerification;
   if (!verification) ui.evidenceStatus.textContent = "Evidence not finalized";
   else if (verification.valid) ui.evidenceStatus.textContent = "Checksums verified";
-  else ui.evidenceStatus.textContent = `Invalid: ${[...verification.missing, ...verification.mismatched].join(", ")}`;
+  else
+    ui.evidenceStatus.textContent = `Invalid: ${[...verification.missing, ...verification.mismatched].join(", ")}`;
 }
 
 function approvalContext(manifest: RunManifest): { taskId: string; phase: ApprovalPhase } | null {
@@ -492,10 +502,16 @@ function renderSnapshot(snapshot: RunSnapshot): void {
   ui.runTitle.textContent = manifest.runId;
   ui.runSubtitle.textContent = `${manifest.branch} · base ${shortId(manifest.baseCommit)} · updated ${formatTimestamp(manifest.updatedAt)}`;
   setPill(ui.runStatus, manifest.status, runStatusClass(manifest.status));
-  ui.resume.disabled = manifest.status === "running" || manifest.status === "completed" || manifest.status === "cancelled";
+  ui.resume.disabled =
+    manifest.status === "running" ||
+    manifest.status === "completed" ||
+    manifest.status === "cancelled";
   ui.cancelRun.disabled = ["completed", "failed", "stopped", "cancelled"].includes(manifest.status);
   ui.metrics.replaceChildren(
-    metric("Tasks", `${String(manifest.metrics.completedTaskCount ?? 0)}/${String(manifest.taskOrder.length)}`),
+    metric(
+      "Tasks",
+      `${String(manifest.metrics.completedTaskCount ?? 0)}/${String(manifest.taskOrder.length)}`,
+    ),
     metric("Attempts", String(manifest.metrics.attemptCount ?? 0)),
     metric("Duration", formatDuration(manifest.metrics.durationMs)),
     metric("Worker failures", String(manifest.metrics.workerFailureCount ?? 0)),
@@ -545,7 +561,11 @@ function renderWorkers(): void {
     const heading = document.createElement("h3");
     heading.textContent = worker.descriptor.displayName;
     const pill = document.createElement("span");
-    setPill(pill, worker.available ? "Available" : "Unavailable", worker.available ? "available" : "unavailable");
+    setPill(
+      pill,
+      worker.available ? "Available" : "Unavailable",
+      worker.available ? "available" : "unavailable",
+    );
     title.append(heading, pill);
     const description = document.createElement("p");
     description.className = "worker-description";
@@ -664,7 +684,8 @@ function appendJobEvent(event: JobEvent): void {
   if (event.job_id !== state.activeJobId) return;
   if (event.channel === "stdout") state.jobStdout.push(event.line);
   else if (event.channel === "stderr") state.jobStderr.push(event.line);
-  const prefix = event.channel === "stderr" ? "[stderr] " : event.channel === "status" ? "[status] " : "";
+  const prefix =
+    event.channel === "stderr" ? "[stderr] " : event.channel === "status" ? "[status] " : "";
   ui.jobConsole.textContent += `${prefix}${event.line}\n`;
   ui.jobConsole.scrollTop = ui.jobConsole.scrollHeight;
   if (event.exit_code !== null) {
@@ -713,7 +734,10 @@ function renderBenchmarkResult(success: boolean): void {
   ui.benchmarkSummary.append(grid, files);
 }
 
-async function launchJob(request: MachineRequest, kind: NonNullable<ConsoleState["activeJobKind"]>): Promise<void> {
+async function launchJob(
+  request: MachineRequest,
+  kind: NonNullable<ConsoleState["activeJobKind"]>,
+): Promise<void> {
   if (state.activeJobId) throw new Error("A desktop job is already active.");
   state.jobStdout = [];
   state.jobStderr = [];
@@ -762,9 +786,24 @@ async function decideApproval(decision: "approve" | "reject"): Promise<void> {
     throw new Error("No pending approval is selected.");
   }
   const note = ui.approvalNote.value.trim() || `${decision} from native run console`;
-  const operation: MachineRequest = decision === "approve"
-    ? { operation: "approve", run_id: runId, task_id: taskId, phase, repository: state.repository, note }
-    : { operation: "reject", run_id: runId, task_id: taskId, phase, repository: state.repository, note };
+  const operation: MachineRequest =
+    decision === "approve"
+      ? {
+          operation: "approve",
+          run_id: runId,
+          task_id: taskId,
+          phase,
+          repository: state.repository,
+          note,
+        }
+      : {
+          operation: "reject",
+          run_id: runId,
+          task_id: taskId,
+          phase,
+          repository: state.repository,
+          note,
+        };
   await queryJson<RunManifest>(operation);
   ui.approvalNote.value = "";
   showToast(`${decision === "approve" ? "Approved" : "Rejected"} ${taskId}.`);
@@ -782,7 +821,10 @@ async function verifySelectedEvidence(): Promise<void> {
   ui.evidenceStatus.textContent = verification.valid
     ? "Checksums verified"
     : `Invalid: ${[...verification.missing, ...verification.mismatched].join(", ")}`;
-  showToast(verification.valid ? "Evidence bundle verified." : "Evidence verification failed.", !verification.valid);
+  showToast(
+    verification.valid ? "Evidence bundle verified." : "Evidence verification failed.",
+    !verification.valid,
+  );
 }
 
 async function runBenchmark(): Promise<void> {
@@ -821,12 +863,48 @@ function bindEvents(): void {
   ui.plan.addEventListener("change", persistWorkspace);
   ui.refresh.addEventListener("click", () => void refreshEverything());
   ui.probe.addEventListener("click", () => void refreshEverything());
-  ui.start.addEventListener("click", () => void startRun().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true)));
-  ui.resume.addEventListener("click", () => void resumeSelectedRun().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true)));
-  ui.cancelRun.addEventListener("click", () => void cancelSelectedRun().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true)));
-  ui.approve.addEventListener("click", () => void decideApproval("approve").catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true)));
-  ui.reject.addEventListener("click", () => void decideApproval("reject").catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true)));
-  ui.verifyEvidence.addEventListener("click", () => void verifySelectedEvidence().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true)));
+  ui.start.addEventListener(
+    "click",
+    () =>
+      void startRun().catch((error: unknown) =>
+        showToast(error instanceof Error ? error.message : String(error), true),
+      ),
+  );
+  ui.resume.addEventListener(
+    "click",
+    () =>
+      void resumeSelectedRun().catch((error: unknown) =>
+        showToast(error instanceof Error ? error.message : String(error), true),
+      ),
+  );
+  ui.cancelRun.addEventListener(
+    "click",
+    () =>
+      void cancelSelectedRun().catch((error: unknown) =>
+        showToast(error instanceof Error ? error.message : String(error), true),
+      ),
+  );
+  ui.approve.addEventListener(
+    "click",
+    () =>
+      void decideApproval("approve").catch((error: unknown) =>
+        showToast(error instanceof Error ? error.message : String(error), true),
+      ),
+  );
+  ui.reject.addEventListener(
+    "click",
+    () =>
+      void decideApproval("reject").catch((error: unknown) =>
+        showToast(error instanceof Error ? error.message : String(error), true),
+      ),
+  );
+  ui.verifyEvidence.addEventListener(
+    "click",
+    () =>
+      void verifySelectedEvidence().catch((error: unknown) =>
+        showToast(error instanceof Error ? error.message : String(error), true),
+      ),
+  );
   ui.probeWorkers.addEventListener("click", () => void loadWorkers());
   ui.runFilter.addEventListener("change", renderRuns);
   ui.eventFilter.addEventListener("change", () => {
@@ -834,17 +912,25 @@ function bindEvents(): void {
   });
   ui.benchmarkForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    void runBenchmark().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true));
+    void runBenchmark().catch((error: unknown) =>
+      showToast(error instanceof Error ? error.message : String(error), true),
+    );
   });
   ui.stopJob.addEventListener("click", () => {
     if (!state.activeJobId) return;
-    void cancelDesktopJob(state.activeJobId).catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true));
+    void cancelDesktopJob(state.activeJobId).catch((error: unknown) =>
+      showToast(error instanceof Error ? error.message : String(error), true),
+    );
   });
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
-    button.addEventListener("click", () => switchView(button.dataset.view as ConsoleState["activeView"]));
+    button.addEventListener("click", () =>
+      switchView(button.dataset.view as ConsoleState["activeView"]),
+    );
   });
   document.querySelectorAll<HTMLButtonElement>("[data-detail-tab]").forEach((button) => {
-    button.addEventListener("click", () => switchDetailTab(button.dataset.detailTab as ConsoleState["detailTab"]));
+    button.addEventListener("click", () =>
+      switchDetailTab(button.dataset.detailTab as ConsoleState["detailTab"]),
+    );
   });
 }
 
@@ -853,7 +939,10 @@ void onMachineJobEvent(appendJobEvent);
 void connect();
 window.setInterval(() => {
   if (state.activeJobId) void loadRuns(true);
-  else if (state.snapshot && ["running", "awaiting_approval", "pending"].includes(state.snapshot.manifest.status)) {
+  else if (
+    state.snapshot &&
+    ["running", "awaiting_approval", "pending"].includes(state.snapshot.manifest.status)
+  ) {
     void loadSnapshot(state.snapshot.manifest.runId, true);
   }
 }, 1800);
