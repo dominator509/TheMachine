@@ -1,12 +1,12 @@
 {
   "name": "the-machine",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "private": true,
-  "description": "Local-first agentic coding platform",
+  "description": "Durable local-first control plane for agentic software delivery",
   "packageManager": "pnpm@11.6.0",
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=22.13.0",
+    "pnpm": ">=11.6.0"
   },
   "scripts": {
     "dev": "turbo run dev --parallel",
@@ -16,6 +16,7 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
+    "test:agentic": "vitest run --project integration tests/integration/agentic-runtime.integration.test.ts",
     "build": "turbo run build",
     "build:release": "node tools/release/build-release.mjs",
     "security:check": "node tools/security/check-secrets.mjs",
@@ -25,7 +26,8 @@
     "db:setup": "node tools/db/setup.mjs",
     "db:migration:create": "node tools/db/create-migration.mjs",
     "db:migrate": "node tools/db/migrate.mjs",
-    "db:migrate:rollback": "node tools/db/rollback.mjs"
+    "db:migrate:rollback": "node tools/db/rollback.mjs",
+    "machine": "node apps/cli/dist/index.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
