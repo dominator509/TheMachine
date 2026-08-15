@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>The Machine — Run Console</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">M</div>
+          <div>
+            <div class="eyebrow">Agentic software delivery control plane</div>
+            <h1>The Machine</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="bridge-status" class="status-pill neutral">Connecting</span>
+          <button id="refresh-button" class="button ghost" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <aside class="left-rail">
+        <section class="rail-section project-section">
+          <div class="section-heading">
+            <span>Workspace</span>
+            <span class="section-kicker">Local</span>
+          </div>
+          <label class="field-label" for="repository-input">Repository</label>
+          <input
+            id="repository-input"
+            class="text-input"
+            type="text"
+            spellcheck="false"
+            placeholder="/path/to/repository"
+          />
+          <label class="field-label" for="plan-input">Machine plan</label>
+          <input
+            id="plan-input"
+            class="text-input"
+            type="text"
+            spellcheck="false"
+            placeholder="/path/to/plan.machine.json"
+          />
+          <div class="button-row">
+            <button id="start-button" class="button primary" type="button">Start run</button>
+            <button id="probe-button" class="button secondary" type="button">Probe</button>
+          </div>
+        </section>
+
+        <nav class="view-navigation" aria-label="Console sections">
+          <button class="nav-button active" type="button" data-view="runs">
+            <span>Runs</span><span id="run-count" class="nav-count">0</span>
+          </button>
+          <button class="nav-button" type="button" data-view="workers">
+            <span>Workers</span><span id="worker-count" class="nav-count">0</span>
+          </button>
+          <button class="nav-button" type="button" data-view="benchmarks">
+            <span>Benchmarks</span><span class="nav-count">↗</span>
+          </button>
+        </nav>
+
+        <section class="rail-section run-browser">
+          <div class="section-heading">
+            <span>Recent runs</span>
+            <select id="run-filter" class="compact-select" aria-label="Filter runs">
+              <option value="all">All</option>
+              <option value="running">Running</option>
+              <option value="awaiting_approval">Awaiting approval</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="stopped">Stopped</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div id="run-list" class="run-list" aria-live="polite">
+            <div class="empty-state compact">Choose a repository to load runs.</div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <section id="runs-view" class="view active" data-view-panel="runs">
+          <div id="no-run" class="empty-state hero-empty">
+            <div class="empty-icon" aria-hidden="true">◎</div>
+            <h2>No run selected</h2>
+            <p>
+              Select a durable run from the left rail, or start a plan in an isolated Git worktree.
+            </p>
+          </div>
+
+          <div id="run-detail" class="run-detail hidden">
+            <div class="run-header">
+              <div>
+                <div id="run-plan-id" class="eyebrow">Plan</div>
+                <h2 id="run-title">Run</h2>
+                <div id="run-subtitle" class="muted"></div>
+              </div>
+              <div class="run-header-actions">
+                <span id="run-status" class="status-pill neutral">Unknown</span>
+                <button id="resume-button" class="button secondary" type="button">Resume</button>
+                <button id="cancel-run-button" class="button danger" type="button">Cancel</button>
+              </div>
+            </div>
+
+            <div id="metrics-grid" class="metrics-grid"></div>
+
+            <section id="approval-panel" class="approval-panel hidden">
+              <div>
+                <div class="eyebrow">Human gate</div>
+                <h3 id="approval-title">Approval required</h3>
+                <p id="approval-description" class="muted"></p>
+              </div>
+              <div class="approval-controls">
+                <input
+                  id="approval-note"
+                  class="text-input"
+                  type="text"
+                  placeholder="Decision note"
+                />
+                <button id="approve-button" class="button success" type="button">Approve</button>
+                <button id="reject-button" class="button danger" type="button">Reject</button>
+              </div>
+            </section>
+
+            <div class="detail-tabs" role="tablist" aria-label="Run detail">
+              <button class="detail-tab active" type="button" data-detail-tab="tasks">Tasks</button>
+              <button class="detail-tab" type="button" data-detail-tab="events">Events</button>
+              <button class="detail-tab" type="button" data-detail-tab="diff">Diff</button>
+              <button class="detail-tab" type="button" data-detail-tab="artifacts">
+                Artifacts
+              </button>
+              <button class="detail-tab" type="button" data-detail-tab="plan">Plan</button>
+            </div>
+
+            <section class="detail-panel active" data-detail-panel="tasks">
+              <div id="task-list" class="task-list"></div>
+            </section>
+            <section class="detail-panel" data-detail-panel="events">
+              <div class="panel-toolbar">
+                <span id="event-count" class="muted">0 events</span>
+                <label class="inline-field"
+                  >Level
+                  <select id="event-filter" class="compact-select">
+                    <option value="all">All</option>
+                    <option value="worker">Worker</option>
+                    <option value="validation">Validation</option>
+                    <option value="policy">Policy</option>
+                    <option value="approval">Approval</option>
+                    <option value="run">Run</option>
+                  </select>
+                </label>
+              </div>
+              <div id="event-list" class="event-list"></div>
+            </section>
+            <section class="detail-panel" data-detail-panel="diff">
+              <pre id="diff-output" class="code-view diff-view">No diff available.</pre>
+            </section>
+            <section class="detail-panel" data-detail-panel="artifacts">
+              <div class="panel-toolbar">
+                <button id="verify-evidence-button" class="button secondary" type="button">
+                  Verify evidence
+                </button>
+                <span id="evidence-status" class="muted"></span>
+              </div>
+              <div id="artifact-list" class="artifact-list"></div>
+            </section>
+            <section class="detail-panel" data-detail-panel="plan">
+              <pre id="plan-output" class="code-view"></pre>
+            </section>
+          </div>
+        </section>
+
+        <section id="workers-view" class="view" data-view-panel="workers">
+          <div class="view-header">
+            <div>
+              <div class="eyebrow">Execution adapters</div>
+              <h2>First-class workers</h2>
+              <p class="muted">
+                Version-probed, noninteractive presets with explicit environment and safety posture.
+              </p>
+            </div>
+            <button id="probe-workers-button" class="button primary" type="button">
+              Probe all
+            </button>
+          </div>
+          <div id="worker-grid" class="worker-grid"></div>
+        </section>
+
+        <section id="benchmarks-view" class="view" data-view-panel="benchmarks">
+          <div class="view-header">
+            <div>
+              <div class="eyebrow">Reproducible evaluation</div>
+              <h2>Public benchmark harness</h2>
+              <p class="muted">
+                Fresh temporary repositories, deterministic validations, scope scoring, and
+                checksum-verified evidence.
+              </p>
+            </div>
+          </div>
+          <div class="benchmark-layout">
+            <form id="benchmark-form" class="benchmark-form">
+              <label class="field-label" for="benchmark-suite">Suite</label>
+              <input id="benchmark-suite" class="text-input" value="smoke" />
+              <label class="field-label" for="benchmark-worker">Worker</label>
+              <select id="benchmark-worker" class="text-input">
+                <option value="fixture">Credential-free fixture</option>
+                <option value="codex">Codex</option>
+                <option value="claude-code">Claude Code</option>
+                <option value="aider">Aider</option>
+                <option value="openhands">OpenHands</option>
+              </select>
+              <label class="field-label" for="benchmark-repeat">Repetitions</label>
+              <input
+                id="benchmark-repeat"
+                class="text-input"
+                type="number"
+                min="1"
+                max="25"
+                value="1"
+              />
+              <button id="benchmark-run-button" class="button primary" type="submit">
+                Run benchmark
+              </button>
+            </form>
+            <div class="benchmark-report">
+              <div class="section-heading">
+                <span>Latest job</span>
+                <span id="benchmark-status" class="status-pill neutral">Idle</span>
+              </div>
+              <div id="benchmark-summary" class="empty-state compact">
+                Run the fixture worker for a credential-free baseline, or select an installed agent.
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="activity-drawer">
+        <div class="section-heading">
+          <span>Job stream</span>
+          <span id="job-status" class="status-pill neutral">Idle</span>
+        </div>
+        <div id="job-meta" class="job-meta muted">No background job.</div>
+        <pre id="job-console" class="job-console" aria-live="polite"></pre>
+        <button id="stop-job-button" class="button danger full hidden" type="button">
+          Stop desktop job
+        </button>
+      </aside>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

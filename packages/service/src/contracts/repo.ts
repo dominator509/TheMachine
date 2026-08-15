@@ -1,6 +1,6 @@
 // Repository profile schemas.
 
-import type { EntityId, SemVer } from "@the-machine/core";
+import type { EntityId, RepositoryPackageManager, SemVer } from "@the-machine/core";
 
 export interface RepoRequest {
   readonly workspaceId: EntityId;
@@ -10,7 +10,7 @@ export interface RepoRequest {
 export interface RepoResponse {
   readonly workspaceId: EntityId;
   readonly rootPath: string;
-  readonly packageManager: "pnpm" | "npm" | "yarn" | "unknown";
+  readonly packageManager: RepositoryPackageManager;
   readonly nodeVersion: SemVer;
   readonly hasPackageJson: boolean;
   readonly hasGit: boolean;

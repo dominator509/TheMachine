@@ -73,6 +73,8 @@ const total = results.length;
 const passed = results.filter((r) => r.passed).length;
 const failed = total - passed;
 console.log(`\nResults: ${passed}/${total} passed, ${failed}/${total} failed`);
-console.log(`Status:  ${allPassed ? "ALL GATES PASSED" : "BLOCKED AT " + results.find((r) => !r.passed)?.name || "UNKNOWN"}`);
+console.log(
+  `Status:  ${allPassed ? "ALL GATES PASSED" : "BLOCKED AT " + results.find((r) => !r.passed)?.name || "UNKNOWN"}`,
+);
 
 process.exit(allPassed ? 0 : 1);

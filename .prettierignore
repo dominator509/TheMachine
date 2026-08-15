@@ -1,8 +1,23 @@
+# Dependency and build artifacts
 pnpm-lock.yaml
-test-results/
-.coverage/
-.turbo/
+node_modules/
 dist/
 build/
-node_modules/
+.turbo/
+release/
+coverage/
+.coverage/
+benchmark-results/
+test-results/
+playwright-report/
+apps/desktop/src-tauri/target/
+
+# Local editor and agent state
+.obsidian/
+.serena/
+
+# Immutable historical execution plans
+.agent/execplans/
+
+# Logs
 *.log

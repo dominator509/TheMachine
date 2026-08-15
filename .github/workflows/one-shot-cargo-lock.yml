@@ -1,0 +1,121 @@
+name: One-shot native repair
+
+on:
+  push:
+    branches:
+      - codex/agentic-runtime-kaizen-v1
+    paths:
+      - .github/workflows/one-shot-cargo-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-verify:
+    if: github.repository_owner == 'dominator509' && github.actor == 'dominator509'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Linux WebKit dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            pkg-config \
+            libssl-dev
+
+      - name: Install frozen JavaScript workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply deterministic source repairs
+        run: |
+          pnpm exec prettier --write packages/service/src/handlers/repoHandler.ts
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/desktop/src-tauri/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          before = '''    child
+              .lock()
+              .map_err(|_| "job lock was poisoned".to_string())?
+              .kill()
+              .map_err(|error| format!("unable to terminate job: {error}"))
+          '''
+          after = '''    let result = {
+              let mut locked_child = child
+                  .lock()
+                  .map_err(|_| "job lock was poisoned".to_string())?;
+              locked_child
+                  .kill()
+                  .map_err(|error| format!("unable to terminate job: {error}"))
+          };
+          result
+          '''
+          if after in text:
+              print("native cancellation lifetime is already repaired")
+          elif before in text:
+              path.write_text(text.replace(before, after, 1), encoding="utf-8")
+              print("repaired native cancellation lifetime")
+          else:
+              raise SystemExit("native cancellation block does not match either known state")
+          PY
+
+      - name: Generate and format native dependency graph
+        run: |
+          cargo generate-lockfile --manifest-path apps/desktop/src-tauri/Cargo.toml
+          cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+      - name: Build native frontend
+        run: pnpm --filter @the-machine/desktop build
+
+      - name: Verify repaired JavaScript and Rust sources
+        run: |
+          pnpm exec prettier --check packages/service/src/handlers/repoHandler.ts
+          cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+          cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+          cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+          pnpm --filter @the-machine/desktop tauri build --no-bundle
+          git diff --check
+
+      - name: Commit only verified repairs
+        run: |
+          if git diff --quiet -- \
+            apps/desktop/src-tauri/Cargo.lock \
+            apps/desktop/src-tauri/build.rs \
+            apps/desktop/src-tauri/src/lib.rs \
+            packages/service/src/handlers/repoHandler.ts; then
+            echo "Native sources and Cargo.lock are already synchronized."
+            exit 0
+          fi
+          git config user.name "The Machine CI"
+          git config user.email "ci@themachine.dev"
+          git add \
+            apps/desktop/src-tauri/Cargo.lock \
+            apps/desktop/src-tauri/build.rs \
+            apps/desktop/src-tauri/src/lib.rs \
+            packages/service/src/handlers/repoHandler.ts
+          git commit -m "fix(desktop): verify native bridge and lock Rust dependencies"
+          git pull --rebase origin codex/agentic-runtime-kaizen-v1
+          git push origin HEAD:codex/agentic-runtime-kaizen-v1

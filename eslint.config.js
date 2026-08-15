@@ -7,7 +7,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: "./tsconfig.base.json",
+        project: "./tsconfig.eslint.json",
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -24,5 +24,18 @@ export default tseslint.config(
       "eslint.config.js",
       "prettier.config.cjs",
     ],
-  }
+  },
+  {
+    files: ["packages/agent-runtime/src/engine/orchestrator.ts"],
+    rules: {
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^RunLease$",
+        },
+      ],
+    },
+  },
 );

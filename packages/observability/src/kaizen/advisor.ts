@@ -83,15 +83,14 @@ export function parseKnownIssues(markdown: string): KnownIssue[] {
     // Determine status — "open" if no resolution or explicit status is "open".
     const rawStatus = (statusMatch?.[1] ?? "").trim().toLowerCase();
     const status: KnownIssue["status"] =
-      rawStatus === "in_progress" ? "in_progress"
-      : rawStatus === "resolved" ? "resolved"
-      : "open";
+      rawStatus === "in_progress" ? "in_progress" : rawStatus === "resolved" ? "resolved" : "open";
 
     const proposedFix = fixMatch?.[1]?.trim();
     const resolution = resMatch?.[1]?.trim();
 
     // If resolution text says "null" or is empty, treat as no resolution.
-    const effectiveResolution = (resolution && resolution !== "null" && resolution !== "") ? resolution : null;
+    const effectiveResolution =
+      resolution && resolution !== "null" && resolution !== "" ? resolution : null;
 
     // Auto-detect resolved status from resolution text.
     const effectiveStatus: KnownIssue["status"] =
@@ -103,7 +102,7 @@ export function parseKnownIssues(markdown: string): KnownIssue[] {
       component: compMatch?.[1]?.trim() ?? "unknown",
       description: descMatch?.[1]?.trim() ?? block.split("\n")[1]?.trim() ?? "no description",
       status: effectiveStatus,
-      proposedFix: (proposedFix && proposedFix !== "null") ? proposedFix : null,
+      proposedFix: proposedFix && proposedFix !== "null" ? proposedFix : null,
       resolution: effectiveResolution,
     });
   }
@@ -198,7 +197,9 @@ export function generateProposal(
   // Generate the proposal XML.
   const now = Date.now();
   const timestamp10min = Math.floor(now / 600_000) * 600_000; // 10-minute bucket
-  const random4 = Math.floor(Math.random() * 10000).toString(36).padStart(4, "0");
+  const random4 = Math.floor(Math.random() * 10000)
+    .toString(36)
+    .padStart(4, "0");
   const proposalId = `PROP-${cfg.agentName}-${String(timestamp10min)}-${random4}`;
 
   // Determine change_type based on the issues.

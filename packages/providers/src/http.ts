@@ -92,12 +92,17 @@ export async function openAIChatCompletion(
   opts: ProviderAdapterOptions,
 ): Promise<ProviderCompletionResponse> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const data = (await postJson(fetchImpl, joinUrl(endpoint, "/chat/completions"), {
-    model: req.model,
-    messages: req.messages,
-    temperature: req.temperature,
-    max_tokens: req.maxTokens,
-  }, opts)) as OpenAIResponse;
+  const data = (await postJson(
+    fetchImpl,
+    joinUrl(endpoint, "/chat/completions"),
+    {
+      model: req.model,
+      messages: req.messages,
+      temperature: req.temperature,
+      max_tokens: req.maxTokens,
+    },
+    opts,
+  )) as OpenAIResponse;
   return {
     id: data.id ?? `completion-${String(Date.now())}`,
     model: data.model ?? req.model,
@@ -132,7 +137,8 @@ export async function anthropicCompletion(
   return {
     id: data.id ?? `completion-${String(Date.now())}`,
     model: data.model ?? req.model,
-    content: data.content?.find((part) => part.type === "text" || part.text !== undefined)?.text ?? "",
+    content:
+      data.content?.find((part) => part.type === "text" || part.text !== undefined)?.text ?? "",
     finishReason: finishReason(data.stop_reason),
     usage: {
       promptTokens: data.usage?.input_tokens ?? 0,

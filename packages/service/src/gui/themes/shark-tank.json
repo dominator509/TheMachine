@@ -5,117 +5,162 @@
   "style": "aquarium",
   "version": "1.0.0",
   "sprites": {
-    "1":  { "name": "Great White Shark",     "defaultState": "swim", "scale": 1.2 },
-    "2":  { "name": "Hammerhead Shark",       "defaultState": "swim", "scale": 1.1 },
-    "3":  { "name": "Lionfish",               "defaultState": "hover", "scale": 0.9 },
-    "4":  { "name": "Moray Eel",              "defaultState": "slither", "scale": 1.0 },
-    "5":  { "name": "Manta Ray",              "defaultState": "glide", "scale": 1.3 },
-    "6":  { "name": "Tiger Shark",            "defaultState": "swim", "scale": 1.2 },
-    "7":  { "name": "Octopus",                "defaultState": "crawl", "scale": 1.0 },
-    "8":  { "name": "Orca",                   "defaultState": "swim", "scale": 1.4 },
-    "9":  { "name": "Angelfish",              "defaultState": "hover", "scale": 0.8 },
-    "10": { "name": "Narwhal",                "defaultState": "swim", "scale": 1.2 },
-    "11": { "name": "Swordfish",              "defaultState": "swim", "scale": 1.1 },
-    "12": { "name": "Pufferfish",             "defaultState": "puff", "scale": 0.9 },
-    "13": { "name": "Sea Turtle",             "defaultState": "swim", "scale": 1.0 },
-    "14": { "name": "Electric Eel",           "defaultState": "slither", "scale": 1.0 },
-    "15": { "name": "Clownfish",              "defaultState": "hover", "scale": 0.7 },
-    "16": { "name": "Whale Shark",            "defaultState": "swim", "scale": 1.6 },
-    "17": { "name": "Seahorse",               "defaultState": "hover", "scale": 0.6 },
-    "18": { "name": "Barracuda",              "defaultState": "swim", "scale": 1.0 },
-    "19": { "name": "Giant Squid",            "defaultState": "crawl", "scale": 1.5 },
-    "20": { "name": "Jellyfish",              "defaultState": "float", "scale": 0.8 },
-    "21": { "name": "Hermit Crab",            "defaultState": "crawl", "scale": 0.7 },
-    "22": { "name": "Dolphin",                "defaultState": "swim", "scale": 1.1 },
-    "23": { "name": "Stingray",               "defaultState": "glide", "scale": 1.0 },
-    "24": { "name": "Mantis Shrimp",          "defaultState": "crawl", "scale": 0.7 }
+    "1": { "name": "Great White Shark", "defaultState": "swim", "scale": 1.2 },
+    "2": { "name": "Hammerhead Shark", "defaultState": "swim", "scale": 1.1 },
+    "3": { "name": "Lionfish", "defaultState": "hover", "scale": 0.9 },
+    "4": { "name": "Moray Eel", "defaultState": "slither", "scale": 1.0 },
+    "5": { "name": "Manta Ray", "defaultState": "glide", "scale": 1.3 },
+    "6": { "name": "Tiger Shark", "defaultState": "swim", "scale": 1.2 },
+    "7": { "name": "Octopus", "defaultState": "crawl", "scale": 1.0 },
+    "8": { "name": "Orca", "defaultState": "swim", "scale": 1.4 },
+    "9": { "name": "Angelfish", "defaultState": "hover", "scale": 0.8 },
+    "10": { "name": "Narwhal", "defaultState": "swim", "scale": 1.2 },
+    "11": { "name": "Swordfish", "defaultState": "swim", "scale": 1.1 },
+    "12": { "name": "Pufferfish", "defaultState": "puff", "scale": 0.9 },
+    "13": { "name": "Sea Turtle", "defaultState": "swim", "scale": 1.0 },
+    "14": { "name": "Electric Eel", "defaultState": "slither", "scale": 1.0 },
+    "15": { "name": "Clownfish", "defaultState": "hover", "scale": 0.7 },
+    "16": { "name": "Whale Shark", "defaultState": "swim", "scale": 1.6 },
+    "17": { "name": "Seahorse", "defaultState": "hover", "scale": 0.6 },
+    "18": { "name": "Barracuda", "defaultState": "swim", "scale": 1.0 },
+    "19": { "name": "Giant Squid", "defaultState": "crawl", "scale": 1.5 },
+    "20": { "name": "Jellyfish", "defaultState": "float", "scale": 0.8 },
+    "21": { "name": "Hermit Crab", "defaultState": "crawl", "scale": 0.7 },
+    "22": { "name": "Dolphin", "defaultState": "swim", "scale": 1.1 },
+    "23": { "name": "Stingray", "defaultState": "glide", "scale": 1.0 },
+    "24": { "name": "Mantis Shrimp", "defaultState": "crawl", "scale": 0.7 }
   },
   "stations": {
     "planning": {
       "name": "Coral Brainstorm Reef",
       "background": "assets/shark-tank/coral-reef.png",
-      "gridCols": 8, "gridRows": 6, "tileSize": 32,
+      "gridCols": 8,
+      "gridRows": 6,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 }, { "col": 3, "row": 0 },
-        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }, { "col": 2, "row": 1 }, { "col": 3, "row": 1 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
+        { "col": 2, "row": 0 },
+        { "col": 3, "row": 0 },
+        { "col": 0, "row": 1 },
+        { "col": 1, "row": 1 },
+        { "col": 2, "row": 1 },
+        { "col": 3, "row": 1 }
       ]
     },
     "coding": {
       "name": "Kelp Forest Code Grotto",
       "background": "assets/shark-tank/kelp-forest.png",
-      "gridCols": 8, "gridRows": 6, "tileSize": 32,
+      "gridCols": 8,
+      "gridRows": 6,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 }, { "col": 3, "row": 0 },
-        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }, { "col": 2, "row": 1 }, { "col": 3, "row": 1 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
+        { "col": 2, "row": 0 },
+        { "col": 3, "row": 0 },
+        { "col": 0, "row": 1 },
+        { "col": 1, "row": 1 },
+        { "col": 2, "row": 1 },
+        { "col": 3, "row": 1 }
       ]
     },
     "code-review": {
       "name": "Shark Patrol Circuit",
       "background": "assets/shark-tank/shark-circuit.png",
-      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "gridCols": 6,
+      "gridRows": 4,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
-        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
+        { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 },
+        { "col": 1, "row": 1 }
       ]
     },
     "qa-testing": {
       "name": "Pufferfish Proving Grounds",
       "background": "assets/shark-tank/pufferfish-grounds.png",
-      "gridCols": 8, "gridRows": 6, "tileSize": 32,
+      "gridCols": 8,
+      "gridRows": 6,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }, { "col": 2, "row": 0 },
-        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
+        { "col": 2, "row": 0 },
+        { "col": 0, "row": 1 },
+        { "col": 1, "row": 1 }
       ]
     },
     "security-scan": {
       "name": "Electric Eel Perimeter",
       "background": "assets/shark-tank/eel-perimeter.png",
-      "gridCols": 4, "gridRows": 4, "tileSize": 32,
+      "gridCols": 4,
+      "gridRows": 4,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
         { "col": 0, "row": 1 }
       ]
     },
     "deploy": {
       "name": "Octopus Launch Cavern",
       "background": "assets/shark-tank/octopus-cavern.png",
-      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "gridCols": 6,
+      "gridRows": 4,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
-        { "col": 0, "row": 1 }, { "col": 1, "row": 1 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
+        { "col": 0, "row": 1 },
+        { "col": 1, "row": 1 }
       ]
     },
     "gate-clear": {
       "name": "Abyssal Gate",
       "background": "assets/shark-tank/abyssal-gate.png",
-      "gridCols": 4, "gridRows": 3, "tileSize": 32,
+      "gridCols": 4,
+      "gridRows": 3,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 }
       ]
     },
     "kaizen": {
       "name": "Jellyfish Meditation Drift",
       "background": "assets/shark-tank/jellyfish-drift.png",
-      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "gridCols": 6,
+      "gridRows": 4,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
         { "col": 0, "row": 1 }
       ]
     },
     "takt": {
       "name": "Dolphin Click-Sync Arena",
       "background": "assets/shark-tank/dolphin-arena.png",
-      "gridCols": 4, "gridRows": 3, "tileSize": 32,
+      "gridCols": 4,
+      "gridRows": 3,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 }
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 }
       ]
     },
     "dependency-check": {
       "name": "Hermit Crab Shell Depot",
       "background": "assets/shark-tank/shell-depot.png",
-      "gridCols": 6, "gridRows": 4, "tileSize": 32,
+      "gridCols": 6,
+      "gridRows": 4,
+      "tileSize": 32,
       "slots": [
-        { "col": 0, "row": 0 }, { "col": 1, "row": 0 },
+        { "col": 0, "row": 0 },
+        { "col": 1, "row": 0 },
         { "col": 0, "row": 1 }
       ]
     }

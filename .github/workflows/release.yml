@@ -4,33 +4,39 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g., 0.2.0-rc.1)"
+        description: "Release version (for example 0.2.0-rc.1)"
         required: true
         type: string
       dry_run:
-        description: "Dry run — build but do not tag or publish"
+        description: "Build and verify without tagging"
         required: false
         default: "true"
         type: choice
-        options:
-          - "true"
-          - "false"
+        options: ["true", "false"]
+
+permissions:
+  contents: write
 
 jobs:
   build:
     name: Build Release Candidate
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22.13.1"
 
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -38,11 +44,17 @@ jobs:
       - name: Full verification
         run: ./scripts/verify.sh
 
+      - name: Benchmark smoke suite
+        run: pnpm run benchmark:smoke
+
       - name: Build release artifacts
         run: pnpm run build:release
 
       - name: Smoke test release artifacts
         run: ./scripts/smoke-test.sh
+
+      - name: Production readiness
+        run: pnpm run production:readiness
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -50,21 +62,33 @@ jobs:
           name: release-${{ inputs.version }}
           path: release/
           if-no-files-found: error
+          retention-days: 30
 
-      - name: Check dry-run mode
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ inputs.version }}
+          path: benchmark-results/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Dry-run result
         if: inputs.dry_run == 'true'
-        run: echo "Dry run complete — artifacts built, smoke passed. No tag or publish occurred."
+        run: echo "Dry run complete — verification, benchmarks, release build, smoke, and readiness passed."
+
+      - name: Validate release version
+        if: inputs.dry_run == 'false'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          node -e "if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(process.env.VERSION)) process.exit(1)"
 
       - name: Tag release candidate
         if: inputs.dry_run == 'false'
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           git config user.name "The Machine CI"
           git config user.email "ci@themachine.dev"
-          git tag -a "v${{ inputs.version }}" -m "Release candidate v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
-
-      - name: Publish notice
-        if: inputs.dry_run == 'false'
-        run: |
-          echo "Tag v${{ inputs.version }} pushed."
-          echo "To publish, run: pnpm publish --dry-run (requires npm token and explicit approval)"
+          git tag -a "v${VERSION}" -m "Release candidate v${VERSION}"
+          git push origin "v${VERSION}"

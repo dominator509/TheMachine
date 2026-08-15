@@ -32,11 +32,12 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
-# Testing & coverage
+# Testing, coverage, and benchmarks
 coverage/
 test-results/
 playwright-report/
 .nyc_output/
+benchmark-results/
 
 # Release artifacts
 release/
@@ -61,9 +62,10 @@ screenshots/
 .*_heartbeat
 COMM_BUFFER.md
 
-# Database
+# Database and Machine state
 *.db
 *.sqlite
 *.sqlite3
 .machine/
+.*.machine-worktrees/
 .git-credentials

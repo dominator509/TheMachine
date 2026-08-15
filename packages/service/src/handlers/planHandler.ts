@@ -31,7 +31,8 @@ export function createPlanHandler(store?: ServiceStore): PlanHandler {
       if (existing) return existing;
       const parsed = parseExecPlanMarkdown(filePath);
       const completedMilestones = parsed.milestones.filter((m) => m.status === "completed").length;
-      const currentMilestone = parsed.milestones.find((m) => m.status !== "completed")?.label ?? null;
+      const currentMilestone =
+        parsed.milestones.find((m) => m.status !== "completed")?.label ?? null;
       const plan: PlanResponse = {
         id,
         title: parsed.title,

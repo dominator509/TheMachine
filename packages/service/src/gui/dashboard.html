@@ -1,481 +1,579 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>War Council — The Machine</title>
-<style>
-/* ===== CSS Reset & Custom Properties ===== */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root {
-  --primary: #1a0a2e;
-  --secondary: #e0a040;
-  --text: #f0e6d0;
-  --panel: rgba(10,5,20,0.88);
-  --accent: #40c0e0;
-  --bg: #0a0510;
-  --grid-gap: 14px;
-  --radius: 8px;
-  --font: 'Segoe UI', system-ui, sans-serif;
-  --mono: 'Cascadia Code', 'Fira Code', monospace;
-}
-body {
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* ===== Header ===== */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--panel);
-  border-bottom: 2px solid var(--secondary);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.logo {
-  font-size: 1.4rem;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  background: linear-gradient(135deg, var(--secondary), var(--accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-#status-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: #666;
-  transition: background 0.3s;
-}
-#status-dot.live { background: #0f0; box-shadow: 0 0 8px #0f0; }
-#status-dot.dead  { background: #f33; box-shadow: 0 0 6px #f00; }
-#status-label { font-size: 0.8rem; opacity: 0.7; }
-
-/* ===== Theme Picker ===== */
-.theme-picker {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.theme-picker select {
-  padding: 6px 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--secondary);
-  background: var(--panel);
-  color: var(--text);
-  font-size: 0.85rem;
-  cursor: pointer;
-  outline: none;
-}
-.theme-picker select:focus { border-color: var(--accent); }
-
-/* ===== Nav Tabs ===== */
-.nav-tabs {
-  display: flex;
-  gap: 4px;
-}
-.nav-tab {
-  padding: 6px 14px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s;
-  opacity: 0.7;
-}
-.nav-tab:hover { opacity: 1; background: rgba(255,255,255,0.06); }
-.nav-tab.active  { opacity: 1; border-color: var(--secondary); background: rgba(255,255,255,0.08); }
-
-/* ===== Main Layout ===== */
-.main {
-  display: flex;
-  min-height: calc(100vh - 60px);
-}
-.content {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-/* ===== Station Grid ===== */
-.stations-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--grid-gap);
-}
-.station-panel {
-  background: var(--panel);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: var(--radius);
-  overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-  background-size: cover;
-  background-position: center;
-  min-height: 140px;
-}
-.station-panel.has-background .station-header {
-  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
-}
-.station-panel:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-}
-.station-header {
-  padding: 10px 14px;
-  background: linear-gradient(135deg, var(--primary), rgba(0,0,0,0.6));
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.station-name {
-  font-weight: 700;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--secondary);
-}
-.station-badge {
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.1);
-}
-.station-slots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px;
-  min-height: 48px;
-  align-items: flex-start;
-}
-
-/* ===== Agent Badge ===== */
-.agent-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  transition: all 0.3s ease;
-  cursor: default;
-  position: relative;
-  white-space: nowrap;
-}
-.agent-badge .sprite {
-  width: 32px; height: 32px;
-  flex-shrink: 0;
-  image-rendering: pixelated;
-  background-size: 64px 32px;
-  background-repeat: no-repeat;
-}
-.agent-badge .sprite.idle {
-  animation: spriteIdle 1.2s steps(2) infinite;
-}
-.agent-badge .sprite.working {
-  animation: spriteWork 1s steps(2) infinite;
-}
-@keyframes spriteIdle {
-  0% { background-position: 0 0; }
-  100% { background-position: -32px 0; }
-}
-@keyframes spriteWork {
-  0% { background-position: 0 0; }
-  100% { background-position: -32px 0; }
-}
-.agent-badge.just-arrived {
-  animation: agentPopIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
-}
-.agent-badge.alert-event {
-  animation: agentAlert 0.6s ease;
-  border-color: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
-}
-.agent-badge.status-busy .sprite {
-  animation: spriteWork 1s steps(2) infinite;
-}
-
-@keyframes agentPopIn {
-  0% { transform: scale(0); opacity: 0; }
-  60% { transform: scale(1.15); }
-  100% { transform: scale(1); opacity: 1; }
-}
-@keyframes agentAlert {
-  0%,100% { background: rgba(255,255,255,0.08); }
-  50% { background: rgba(255,200,0,0.2); }
-}
-@keyframes pulse {
-  0%,100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-}
-
-/* ===== Event Log Sidebar ===== */
-.event-log {
-  width: 300px;
-  background: var(--panel);
-  border-left: 1px solid rgba(255,255,255,0.08);
-  padding: 16px;
-  overflow-y: auto;
-  max-height: calc(100vh - 60px);
-  position: sticky;
-  top: 60px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.event-log h3 {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--secondary);
-  opacity: 0.8;
-  margin-bottom: 4px;
-}
-.event-entry {
-  font-size: 0.75rem;
-  font-family: var(--mono);
-  padding: 6px 10px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.03);
-  border-left: 3px solid var(--secondary);
-  animation: slideIn 0.3s ease;
-  word-break: break-all;
-}
-.event-entry.type-alert  { border-color: #f66; background: rgba(255,0,0,0.08); }
-.event-entry.type-status { border-color: var(--accent); }
-.event-entry.type-error  { border-color: #f00; }
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(10px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-/* ===== Empty State ===== */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  opacity: 0.5;
-}
-.empty-state p { margin-top: 8px; font-size: 0.85rem; }
-
-/* ===== Responsive ===== */
-@media (max-width: 768px) {
-  .main { flex-direction: column; }
-  .event-log {
-    width: 100%;
-    max-height: 200px;
-    border-left: none;
-    border-top: 1px solid rgba(255,255,255,0.08);
-  }
-  .stations-grid {
-    grid-template-columns: 1fr;
-  }
-  .header {
-    padding: 8px 12px;
-  }
-  .logo { font-size: 1.1rem; }
-}
-</style>
-</head>
-<body>
-
-<header class="header">
-  <div class="header-left">
-    <span class="logo">⚔ War Council</span>
-    <span id="status-dot"></span>
-    <span id="status-label">disconnected</span>
-  </div>
-  <div class="header-controls">
-    <div class="theme-picker">
-      <label for="theme-select" style="font-size:0.8rem;opacity:0.7">Theme:</label>
-      <select id="theme-select">
-        <option value="">Loading...</option>
-      </select>
-    </div>
-    <nav class="nav-tabs">
-      <button class="nav-tab active" data-view="stations">Stations</button>
-      <button class="nav-tab" data-view="log">Event Log</button>
-      <button class="nav-tab" data-view="about">About</button>
-    </nav>
-    <a href="/builder" class="nav-tab" style="text-decoration:none" title="Open the GUI Builder">🎨 Builder</a>
-  </div>
-</header>
-
-<div class="main">
-  <main class="content" id="content-view">
-    <div id="stations-view" class="stations-grid">
-      <div class="empty-state">
-        <div style="font-size:2rem">🗡️</div>
-        <p>Loading War Council...</p>
-      </div>
-    </div>
-    <div id="log-view" style="display:none">
-      <div class="event-log" style="width:100%;max-height:calc(100vh - 120px);border:none" id="full-log">
-        <h3>📜 Event Chronicle</h3>
-        <div class="empty-state"><p>No events yet. Start the pipeline to see activity.</p></div>
-      </div>
-    </div>
-    <div id="about-view" style="display:none;max-width:700px;margin:0 auto">
-      <div style="padding:20px;line-height:1.7">
-        <h2 style="color:var(--secondary);margin-bottom:12px">⚔ The War Council</h2>
-        <p>This is the live command center for <strong>The Machine</strong> — a multi-agent development pipeline where 24 AI agents collaborate across 10 specialized stations.</p>
-        <p style="margin-top:12px">Each station represents a phase in the pipeline. Agents move between stations as work progresses. The SSE stream delivers real-time events from the backend.</p>
-        <h3 style="color:var(--accent);margin-top:20px;margin-bottom:8px">Stations</h3>
-        <dl id="stations-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85rem"></dl>
-        <h3 style="color:var(--accent);margin-top:20px;margin-bottom:8px">Shortcuts</h3>
-        <p style="font-size:0.85rem">
-          <kbd style="background:var(--panel);padding:2px 6px;border-radius:3px">T</kbd> Toggle theme &nbsp;
-          <kbd style="background:var(--panel);padding:2px 6px;border-radius:3px">1-3</kbd> Switch views &nbsp;
-          <kbd style="background:var(--panel);padding:2px 6px;border-radius:3px">B</kbd> Open builder
-        </p>
-      </div>
-    </div>
-  </main>
-
-  <aside class="event-log" id="event-sidebar">
-    <h3>📜 Events</h3>
-    <div id="event-list"></div>
-  </aside>
-</div>
-
-<script>
-// ============================================================================
-// Dashboard Engine
-// ============================================================================
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => document.querySelectorAll(s);
-
-// --- State ---
-let currentTheme = null;
-let themes = [];
-let sseSource = null;
-let eventCount = 0;
-const MAX_EVENTS = 100;
-const stations = {};     // stationId -> { panel, slotsEl, agents: Set }
-const agentBadges = {};  // agentId -> badge element
-
-// --- SSE Connection ---
-function connectSSE() {
-  if (sseSource) sseSource.close();
-  sseSource = new EventSource('/api/pipeline-stream');
-
-  sseSource.onopen = () => {
-    $('#status-dot').className = 'live';
-    $('#status-label').textContent = 'connected';
-  };
-
-  sseSource.onerror = () => {
-    $('#status-dot').className = 'dead';
-    $('#status-label').textContent = 'reconnecting...';
-  };
-
-  sseSource.onmessage = (e) => {
-    try {
-      const event = JSON.parse(e.data);
-      if (event.type === 'connected') return; // heartbeat
-      handlePipelineEvent(event);
-    } catch {}
-  };
-}
-
-function handlePipelineEvent(event) {
-  eventCount++;
-  const { eventId, agentId, eventType, station, theme, payload } = event;
-  const agent = currentTheme?.sprites?.[String(agentId)] || null;
-  const agentName = agent?.name || `Agent #${agentId}`;
-
-  // If theme broadcast, reload
-  if (theme && theme !== currentTheme?.name) {
-    loadTheme(theme);
-  }
-
-  if (!station) return;
-
-  // Ensure station & badge exist
-  findOrCreateStationPanel(station);
-  const badge = findOrCreateAgentBadge(agentId, agentName, station);
-
-  // Animate
-  badge.classList.remove('just-arrived', 'alert-event');
-  void badge.offsetWidth; // force reflow
-  if (eventType === 'alert') {
-    badge.classList.add('alert-event');
-    // Switch sprite to working animation
-    const sprite = badge.querySelector('.sprite');
-    if (sprite) {
-      sprite.className = 'sprite working';
-      if (badge.dataset.workSrc) {
-        sprite.style.backgroundImage = `url(${badge.dataset.workSrc})`;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>War Council — The Machine</title>
+    <style>
+      /* ===== CSS Reset & Custom Properties ===== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
-      setTimeout(() => {
-        sprite.className = 'sprite idle';
-        if (badge.dataset.idleSrc) {
-          sprite.style.backgroundImage = `url(${badge.dataset.idleSrc})`;
+      :root {
+        --primary: #1a0a2e;
+        --secondary: #e0a040;
+        --text: #f0e6d0;
+        --panel: rgba(10, 5, 20, 0.88);
+        --accent: #40c0e0;
+        --bg: #0a0510;
+        --grid-gap: 14px;
+        --radius: 8px;
+        --font: "Segoe UI", system-ui, sans-serif;
+        --mono: "Cascadia Code", "Fira Code", monospace;
+      }
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ===== Header ===== */
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: var(--panel);
+        border-bottom: 2px solid var(--secondary);
+        backdrop-filter: blur(12px);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .logo {
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        background: linear-gradient(135deg, var(--secondary), var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      #status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #666;
+        transition: background 0.3s;
+      }
+      #status-dot.live {
+        background: #0f0;
+        box-shadow: 0 0 8px #0f0;
+      }
+      #status-dot.dead {
+        background: #f33;
+        box-shadow: 0 0 6px #f00;
+      }
+      #status-label {
+        font-size: 0.8rem;
+        opacity: 0.7;
+      }
+
+      /* ===== Theme Picker ===== */
+      .theme-picker {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .theme-picker select {
+        padding: 6px 10px;
+        border-radius: var(--radius);
+        border: 1px solid var(--secondary);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.85rem;
+        cursor: pointer;
+        outline: none;
+      }
+      .theme-picker select:focus {
+        border-color: var(--accent);
+      }
+
+      /* ===== Nav Tabs ===== */
+      .nav-tabs {
+        display: flex;
+        gap: 4px;
+      }
+      .nav-tab {
+        padding: 6px 14px;
+        border-radius: var(--radius);
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        opacity: 0.7;
+      }
+      .nav-tab:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .nav-tab.active {
+        opacity: 1;
+        border-color: var(--secondary);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* ===== Main Layout ===== */
+      .main {
+        display: flex;
+        min-height: calc(100vh - 60px);
+      }
+      .content {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      /* ===== Station Grid ===== */
+      .stations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: var(--grid-gap);
+      }
+      .station-panel {
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius);
+        overflow: hidden;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        background-size: cover;
+        background-position: center;
+        min-height: 140px;
+      }
+      .station-panel.has-background .station-header {
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 100%);
+      }
+      .station-panel:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+      .station-header {
+        padding: 10px 14px;
+        background: linear-gradient(135deg, var(--primary), rgba(0, 0, 0, 0.6));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .station-name {
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--secondary);
+      }
+      .station-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .station-slots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px;
+        min-height: 48px;
+        align-items: flex-start;
+      }
+
+      /* ===== Agent Badge ===== */
+      .agent-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        transition: all 0.3s ease;
+        cursor: default;
+        position: relative;
+        white-space: nowrap;
+      }
+      .agent-badge .sprite {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        image-rendering: pixelated;
+        background-size: 64px 32px;
+        background-repeat: no-repeat;
+      }
+      .agent-badge .sprite.idle {
+        animation: spriteIdle 1.2s steps(2) infinite;
+      }
+      .agent-badge .sprite.working {
+        animation: spriteWork 1s steps(2) infinite;
+      }
+      @keyframes spriteIdle {
+        0% {
+          background-position: 0 0;
         }
-      }, 3000);
-    }
-  } else {
-    badge.classList.add('just-arrived');
-  }
+        100% {
+          background-position: -32px 0;
+        }
+      }
+      @keyframes spriteWork {
+        0% {
+          background-position: 0 0;
+        }
+        100% {
+          background-position: -32px 0;
+        }
+      }
+      .agent-badge.just-arrived {
+        animation: agentPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .agent-badge.alert-event {
+        animation: agentAlert 0.6s ease;
+        border-color: var(--accent);
+        box-shadow: 0 0 12px var(--accent);
+      }
+      .agent-badge.status-busy .sprite {
+        animation: spriteWork 1s steps(2) infinite;
+      }
 
-  // Move badge to correct station
-  const target = stations[station]?.slotsEl;
-  if (target && badge.parentElement !== target) {
-    target.appendChild(badge);
-  }
+      @keyframes agentPopIn {
+        0% {
+          transform: scale(0);
+          opacity: 0;
+        }
+        60% {
+          transform: scale(1.15);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      @keyframes agentAlert {
+        0%,
+        100% {
+          background: rgba(255, 255, 255, 0.08);
+        }
+        50% {
+          background: rgba(255, 200, 0, 0.2);
+        }
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.2);
+        }
+      }
 
-  // Log event
-  addEventEntry(eventId, agentName, eventType, station, payload);
-}
+      /* ===== Event Log Sidebar ===== */
+      .event-log {
+        width: 300px;
+        background: var(--panel);
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 16px;
+        overflow-y: auto;
+        max-height: calc(100vh - 60px);
+        position: sticky;
+        top: 60px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .event-log h3 {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--secondary);
+        opacity: 0.8;
+        margin-bottom: 4px;
+      }
+      .event-entry {
+        font-size: 0.75rem;
+        font-family: var(--mono);
+        padding: 6px 10px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.03);
+        border-left: 3px solid var(--secondary);
+        animation: slideIn 0.3s ease;
+        word-break: break-all;
+      }
+      .event-entry.type-alert {
+        border-color: #f66;
+        background: rgba(255, 0, 0, 0.08);
+      }
+      .event-entry.type-status {
+        border-color: var(--accent);
+      }
+      .event-entry.type-error {
+        border-color: #f00;
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
 
-// --- Station Panel Management ---
-function findOrCreateStationPanel(stationId) {
-  if (stations[stationId]) return stations[stationId].panel;
+      /* ===== Empty State ===== */
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        opacity: 0.5;
+      }
+      .empty-state p {
+        margin-top: 8px;
+        font-size: 0.85rem;
+      }
 
-  const grid = $('#stations-view');
-  // Remove empty state if present
-  const empty = grid.querySelector('.empty-state');
-  if (empty) empty.remove();
+      /* ===== Responsive ===== */
+      @media (max-width: 768px) {
+        .main {
+          flex-direction: column;
+        }
+        .event-log {
+          width: 100%;
+          max-height: 200px;
+          border-left: none;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .stations-grid {
+          grid-template-columns: 1fr;
+        }
+        .header {
+          padding: 8px 12px;
+        }
+        .logo {
+          font-size: 1.1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">⚔ War Council</span>
+        <span id="status-dot"></span>
+        <span id="status-label">disconnected</span>
+      </div>
+      <div class="header-controls">
+        <div class="theme-picker">
+          <label for="theme-select" style="font-size: 0.8rem; opacity: 0.7">Theme:</label>
+          <select id="theme-select">
+            <option value="">Loading...</option>
+          </select>
+        </div>
+        <nav class="nav-tabs">
+          <button class="nav-tab active" data-view="stations">Stations</button>
+          <button class="nav-tab" data-view="log">Event Log</button>
+          <button class="nav-tab" data-view="about">About</button>
+        </nav>
+        <a
+          href="/builder"
+          class="nav-tab"
+          style="text-decoration: none"
+          title="Open the GUI Builder"
+          >🎨 Builder</a
+        >
+      </div>
+    </header>
 
-  const panel = document.createElement('div');
-  panel.className = 'station-panel';
+    <div class="main">
+      <main class="content" id="content-view">
+        <div id="stations-view" class="stations-grid">
+          <div class="empty-state">
+            <div style="font-size: 2rem">🗡️</div>
+            <p>Loading War Council...</p>
+          </div>
+        </div>
+        <div id="log-view" style="display: none">
+          <div
+            class="event-log"
+            style="width: 100%; max-height: calc(100vh - 120px); border: none"
+            id="full-log"
+          >
+            <h3>📜 Event Chronicle</h3>
+            <div class="empty-state"><p>No events yet. Start the pipeline to see activity.</p></div>
+          </div>
+        </div>
+        <div id="about-view" style="display: none; max-width: 700px; margin: 0 auto">
+          <div style="padding: 20px; line-height: 1.7">
+            <h2 style="color: var(--secondary); margin-bottom: 12px">⚔ The War Council</h2>
+            <p>
+              This is the live command center for <strong>The Machine</strong> — a multi-agent
+              development pipeline where 24 AI agents collaborate across 10 specialized stations.
+            </p>
+            <p style="margin-top: 12px">
+              Each station represents a phase in the pipeline. Agents move between stations as work
+              progresses. The SSE stream delivers real-time events from the backend.
+            </p>
+            <h3 style="color: var(--accent); margin-top: 20px; margin-bottom: 8px">Stations</h3>
+            <dl
+              id="stations-legend"
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem"
+            ></dl>
+            <h3 style="color: var(--accent); margin-top: 20px; margin-bottom: 8px">Shortcuts</h3>
+            <p style="font-size: 0.85rem">
+              <kbd style="background: var(--panel); padding: 2px 6px; border-radius: 3px">T</kbd>
+              Toggle theme &nbsp;
+              <kbd style="background: var(--panel); padding: 2px 6px; border-radius: 3px">1-3</kbd>
+              Switch views &nbsp;
+              <kbd style="background: var(--panel); padding: 2px 6px; border-radius: 3px">B</kbd>
+              Open builder
+            </p>
+          </div>
+        </div>
+      </main>
 
-  const stDef = currentTheme?.stations?.[stationId];
-  const displayName = stDef?.label || stDef?.name || stationId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      <aside class="event-log" id="event-sidebar">
+        <h3>📜 Events</h3>
+        <div id="event-list"></div>
+      </aside>
+    </div>
 
-  // Apply background image from theme
-  if (stDef?.backgroundImage) {
-    panel.style.backgroundImage = `url(${stDef.backgroundImage})`;
-    panel.classList.add('has-background');
-  }
+    <script>
+      // ============================================================================
+      // Dashboard Engine
+      // ============================================================================
+      const $ = (s) => document.querySelector(s);
+      const $$ = (s) => document.querySelectorAll(s);
 
-  panel.innerHTML = `
+      // --- State ---
+      let currentTheme = null;
+      let themes = [];
+      let sseSource = null;
+      let eventCount = 0;
+      const MAX_EVENTS = 100;
+      const stations = {}; // stationId -> { panel, slotsEl, agents: Set }
+      const agentBadges = {}; // agentId -> badge element
+
+      // --- SSE Connection ---
+      function connectSSE() {
+        if (sseSource) sseSource.close();
+        sseSource = new EventSource("/api/pipeline-stream");
+
+        sseSource.onopen = () => {
+          $("#status-dot").className = "live";
+          $("#status-label").textContent = "connected";
+        };
+
+        sseSource.onerror = () => {
+          $("#status-dot").className = "dead";
+          $("#status-label").textContent = "reconnecting...";
+        };
+
+        sseSource.onmessage = (e) => {
+          try {
+            const event = JSON.parse(e.data);
+            if (event.type === "connected") return; // heartbeat
+            handlePipelineEvent(event);
+          } catch {}
+        };
+      }
+
+      function handlePipelineEvent(event) {
+        eventCount++;
+        const { eventId, agentId, eventType, station, theme, payload } = event;
+        const agent = currentTheme?.sprites?.[String(agentId)] || null;
+        const agentName = agent?.name || `Agent #${agentId}`;
+
+        // If theme broadcast, reload
+        if (theme && theme !== currentTheme?.name) {
+          loadTheme(theme);
+        }
+
+        if (!station) return;
+
+        // Ensure station & badge exist
+        findOrCreateStationPanel(station);
+        const badge = findOrCreateAgentBadge(agentId, agentName, station);
+
+        // Animate
+        badge.classList.remove("just-arrived", "alert-event");
+        void badge.offsetWidth; // force reflow
+        if (eventType === "alert") {
+          badge.classList.add("alert-event");
+          // Switch sprite to working animation
+          const sprite = badge.querySelector(".sprite");
+          if (sprite) {
+            sprite.className = "sprite working";
+            if (badge.dataset.workSrc) {
+              sprite.style.backgroundImage = `url(${badge.dataset.workSrc})`;
+            }
+            setTimeout(() => {
+              sprite.className = "sprite idle";
+              if (badge.dataset.idleSrc) {
+                sprite.style.backgroundImage = `url(${badge.dataset.idleSrc})`;
+              }
+            }, 3000);
+          }
+        } else {
+          badge.classList.add("just-arrived");
+        }
+
+        // Move badge to correct station
+        const target = stations[station]?.slotsEl;
+        if (target && badge.parentElement !== target) {
+          target.appendChild(badge);
+        }
+
+        // Log event
+        addEventEntry(eventId, agentName, eventType, station, payload);
+      }
+
+      // --- Station Panel Management ---
+      function findOrCreateStationPanel(stationId) {
+        if (stations[stationId]) return stations[stationId].panel;
+
+        const grid = $("#stations-view");
+        // Remove empty state if present
+        const empty = grid.querySelector(".empty-state");
+        if (empty) empty.remove();
+
+        const panel = document.createElement("div");
+        panel.className = "station-panel";
+
+        const stDef = currentTheme?.stations?.[stationId];
+        const displayName =
+          stDef?.label ||
+          stDef?.name ||
+          stationId.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+        // Apply background image from theme
+        if (stDef?.backgroundImage) {
+          panel.style.backgroundImage = `url(${stDef.backgroundImage})`;
+          panel.classList.add("has-background");
+        }
+
+        panel.innerHTML = `
     <div class="station-header">
       <span class="station-name">${displayName}</span>
       <span class="station-badge" id="count-${stationId}">0</span>
@@ -483,238 +581,278 @@ function findOrCreateStationPanel(stationId) {
     <div class="station-slots" id="slots-${stationId}"></div>
   `;
 
-  grid.appendChild(panel);
+        grid.appendChild(panel);
 
-  const slotsEl = panel.querySelector(`#slots-${stationId}`);
-  stations[stationId] = {
-    panel,
-    slotsEl,
-    agents: new Set(),
-    countEl: panel.querySelector(`#count-${stationId}`),
-  };
+        const slotsEl = panel.querySelector(`#slots-${stationId}`);
+        stations[stationId] = {
+          panel,
+          slotsEl,
+          agents: new Set(),
+          countEl: panel.querySelector(`#count-${stationId}`),
+        };
 
-  return panel;
-}
+        return panel;
+      }
 
-// --- Agent Badge Management ---
-const AGENT_COLORS = [
-  '#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4',
-  '#46f0f0','#f032e6','#bcf60c','#fabebe','#008080','#e6beff',
-  '#9a6324','#fffac8','#800000','#aaffc3','#808000','#ffd8b1',
-  '#000075','#808080','#ff4500','#7fffd4','#8a2be2','#ff69b4'
-];
+      // --- Agent Badge Management ---
+      const AGENT_COLORS = [
+        "#e6194b",
+        "#3cb44b",
+        "#ffe119",
+        "#4363d8",
+        "#f58231",
+        "#911eb4",
+        "#46f0f0",
+        "#f032e6",
+        "#bcf60c",
+        "#fabebe",
+        "#008080",
+        "#e6beff",
+        "#9a6324",
+        "#fffac8",
+        "#800000",
+        "#aaffc3",
+        "#808000",
+        "#ffd8b1",
+        "#000075",
+        "#808080",
+        "#ff4500",
+        "#7fffd4",
+        "#8a2be2",
+        "#ff69b4",
+      ];
 
-function findOrCreateAgentBadge(agentId, name, station) {
-  if (agentBadges[agentId]) return agentBadges[agentId];
+      function findOrCreateAgentBadge(agentId, name, station) {
+        if (agentBadges[agentId]) return agentBadges[agentId];
 
-  const badge = document.createElement('span');
-  badge.className = 'agent-badge';
-  badge.title = name;
+        const badge = document.createElement("span");
+        badge.className = "agent-badge";
+        badge.title = name;
 
-  // Try to get sprite from theme, fall back to avatar
-  const spriteCfg = currentTheme?.sprites?.[String(agentId)];
-  const idleSrc = spriteCfg?.animations?.idle?.src;
-  const workSrc = spriteCfg?.animations?.[spriteCfg?.defaultState]?.src;
+        // Try to get sprite from theme, fall back to avatar
+        const spriteCfg = currentTheme?.sprites?.[String(agentId)];
+        const idleSrc = spriteCfg?.animations?.idle?.src;
+        const workSrc = spriteCfg?.animations?.[spriteCfg?.defaultState]?.src;
 
-  if (idleSrc) {
-    badge.dataset.idleSrc = idleSrc;
-    badge.dataset.workSrc = workSrc || idleSrc;
-    badge.innerHTML = `<span class="sprite idle" style="background-image:url(${idleSrc})"></span>${name}`;
-  } else {
-    // Fallback: colored initials
-    const initial = name.charAt(0).toUpperCase();
-    const color = AGENT_COLORS[parseInt(agentId) % AGENT_COLORS.length];
-    badge.innerHTML = `<span class="avatar" style="background:${color}">${initial}</span>${name}`;
-  }
+        if (idleSrc) {
+          badge.dataset.idleSrc = idleSrc;
+          badge.dataset.workSrc = workSrc || idleSrc;
+          badge.innerHTML = `<span class="sprite idle" style="background-image:url(${idleSrc})"></span>${name}`;
+        } else {
+          // Fallback: colored initials
+          const initial = name.charAt(0).toUpperCase();
+          const color = AGENT_COLORS[parseInt(agentId) % AGENT_COLORS.length];
+          badge.innerHTML = `<span class="avatar" style="background:${color}">${initial}</span>${name}`;
+        }
 
-  agentBadges[agentId] = badge;
+        agentBadges[agentId] = badge;
 
-  // Track in station
-  if (station && stations[station]) {
-    stations[station].agents.add(agentId);
-    stations[station].countEl.textContent = stations[station].agents.size;
-  }
+        // Track in station
+        if (station && stations[station]) {
+          stations[station].agents.add(agentId);
+          stations[station].countEl.textContent = stations[station].agents.size;
+        }
 
-  return badge;
-}
+        return badge;
+      }
 
-// --- Event Logging ---
-function addEventEntry(eventId, agentName, eventType, station, payload) {
-  const text = `[${station}] ${agentName} → ${eventType}` + (payload?.msg ? `: ${payload.msg}` : '');
+      // --- Event Logging ---
+      function addEventEntry(eventId, agentName, eventType, station, payload) {
+        const text =
+          `[${station}] ${agentName} → ${eventType}` + (payload?.msg ? `: ${payload.msg}` : "");
 
-  // Sidebar
-  const sidebarList = $('#event-list');
-  const entry = document.createElement('div');
-  entry.className = `event-entry type-${eventType || 'status'}`;
-  entry.textContent = text;
-  sidebarList.prepend(entry);
+        // Sidebar
+        const sidebarList = $("#event-list");
+        const entry = document.createElement("div");
+        entry.className = `event-entry type-${eventType || "status"}`;
+        entry.textContent = text;
+        sidebarList.prepend(entry);
 
-  // Full log
-  const fullLogList = $('#full-log');
-  const fullEntry = entry.cloneNode(true);
-  if (fullLogList.querySelector('.empty-state')) fullLogList.querySelector('.empty-state').remove();
-  fullLogList.prepend(fullEntry);
+        // Full log
+        const fullLogList = $("#full-log");
+        const fullEntry = entry.cloneNode(true);
+        if (fullLogList.querySelector(".empty-state"))
+          fullLogList.querySelector(".empty-state").remove();
+        fullLogList.prepend(fullEntry);
 
-  // Cap at MAX_EVENTS
-  while (sidebarList.children.length > MAX_EVENTS) sidebarList.lastChild.remove();
-  while (fullLogList.children.length > MAX_EVENTS + 1) fullLogList.lastChild.remove(); // +1 for h3
-}
+        // Cap at MAX_EVENTS
+        while (sidebarList.children.length > MAX_EVENTS) sidebarList.lastChild.remove();
+        while (fullLogList.children.length > MAX_EVENTS + 1) fullLogList.lastChild.remove(); // +1 for h3
+      }
 
-// --- Agent Seeding ---
-function seedAgents() {
-  if (!currentTheme?.sprites) return;
-  const spriteIds = Object.keys(currentTheme.sprites);
-  const stationIds = Object.keys(currentTheme.stations || {});
-  if (stationIds.length === 0 || spriteIds.length === 0) return;
+      // --- Agent Seeding ---
+      function seedAgents() {
+        if (!currentTheme?.sprites) return;
+        const spriteIds = Object.keys(currentTheme.sprites);
+        const stationIds = Object.keys(currentTheme.stations || {});
+        if (stationIds.length === 0 || spriteIds.length === 0) return;
 
-  // Clear existing agent badges since theme changed
-  Object.keys(agentBadges).forEach(id => {
-    agentBadges[id]?.remove();
-    delete agentBadges[id];
-  });
+        // Clear existing agent badges since theme changed
+        Object.keys(agentBadges).forEach((id) => {
+          agentBadges[id]?.remove();
+          delete agentBadges[id];
+        });
 
-  spriteIds.forEach((agentId, i) => {
-    const sprite = currentTheme.sprites[agentId];
-    const stationId = stationIds[i % stationIds.length];
-    const name = sprite.name || `Agent #${agentId}`;
-    const badge = findOrCreateAgentBadge(agentId, name, stationId);
-    const target = stations[stationId]?.slotsEl;
-    if (target && badge.parentElement !== target) {
-      target.appendChild(badge);
-    }
-    // Track in station agents set
-    if (stations[stationId]) {
-      stations[stationId].agents.add(agentId);
-      stations[stationId].countEl.textContent = stations[stationId].agents.size;
-    }
-  });
-}
+        spriteIds.forEach((agentId, i) => {
+          const sprite = currentTheme.sprites[agentId];
+          const stationId = stationIds[i % stationIds.length];
+          const name = sprite.name || `Agent #${agentId}`;
+          const badge = findOrCreateAgentBadge(agentId, name, stationId);
+          const target = stations[stationId]?.slotsEl;
+          if (target && badge.parentElement !== target) {
+            target.appendChild(badge);
+          }
+          // Track in station agents set
+          if (stations[stationId]) {
+            stations[stationId].agents.add(agentId);
+            stations[stationId].countEl.textContent = stations[stationId].agents.size;
+          }
+        });
+      }
 
-// --- Theme Loading ---
-async function loadTheme(name) {
-  try {
-    const res = await fetch(`/api/theme/${name}`);
-    if (!res.ok) throw new Error('not found');
-    currentTheme = await res.json();
-    applyChrome(currentTheme.chrome);
-    renderAllStations();
-    seedAgents();
-  } catch (err) {
-    console.error('Failed to load theme:', name, err);
-  }
-}
+      // --- Theme Loading ---
+      async function loadTheme(name) {
+        try {
+          const res = await fetch(`/api/theme/${name}`);
+          if (!res.ok) throw new Error("not found");
+          currentTheme = await res.json();
+          applyChrome(currentTheme.chrome);
+          renderAllStations();
+          seedAgents();
+        } catch (err) {
+          console.error("Failed to load theme:", name, err);
+        }
+      }
 
-function applyChrome(chrome) {
-  if (!chrome) return;
-  const root = document.documentElement.style;
-  // Support both key formats: flat (moria-dwarves) and nested (fft-chibi)
-  if (chrome.backgroundColor) {
-    // Flat format (moria-dwarves, hobbiton, shark-tank)
-    root.setProperty('--primary', chrome.backgroundColor);
-    root.setProperty('--secondary', chrome.accentColor);
-    root.setProperty('--text', chrome.textColor);
-    root.setProperty('--panel', chrome.panelBackground);
-    root.setProperty('--bg', chrome.backgroundColor + '08');
-  } else {
-    // Nested format (fft-chibi)
-    root.setProperty('--primary', chrome.primary);
-    root.setProperty('--secondary', chrome.secondary);
-    root.setProperty('--text', chrome.text);
-    root.setProperty('--panel', chrome.panel);
-    root.setProperty('--bg', (chrome.primary || '#0a0510') + '08');
-  }
-}
+      function applyChrome(chrome) {
+        if (!chrome) return;
+        const root = document.documentElement.style;
+        // Support both key formats: flat (moria-dwarves) and nested (fft-chibi)
+        if (chrome.backgroundColor) {
+          // Flat format (moria-dwarves, hobbiton, shark-tank)
+          root.setProperty("--primary", chrome.backgroundColor);
+          root.setProperty("--secondary", chrome.accentColor);
+          root.setProperty("--text", chrome.textColor);
+          root.setProperty("--panel", chrome.panelBackground);
+          root.setProperty("--bg", chrome.backgroundColor + "08");
+        } else {
+          // Nested format (fft-chibi)
+          root.setProperty("--primary", chrome.primary);
+          root.setProperty("--secondary", chrome.secondary);
+          root.setProperty("--text", chrome.text);
+          root.setProperty("--panel", chrome.panel);
+          root.setProperty("--bg", (chrome.primary || "#0a0510") + "08");
+        }
+      }
 
-function renderAllStations() {
-  if (!currentTheme) return;
+      function renderAllStations() {
+        if (!currentTheme) return;
 
-  const grid = $('#stations-view');
-  // Clear existing station panels but keep empty-state logic
-  Object.keys(stations).forEach(k => {
-    stations[k].panel?.remove();
-    delete stations[k];
-  });
+        const grid = $("#stations-view");
+        // Clear existing station panels but keep empty-state logic
+        Object.keys(stations).forEach((k) => {
+          stations[k].panel?.remove();
+          delete stations[k];
+        });
 
-  // Render each station from the theme
-  const stationIds = Object.keys(currentTheme.stations || {});
-  if (stationIds.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><div style="font-size:2rem">🗡️</div><p>No stations in this theme.</p></div>';
-    return;
-  }
+        // Render each station from the theme
+        const stationIds = Object.keys(currentTheme.stations || {});
+        if (stationIds.length === 0) {
+          grid.innerHTML =
+            '<div class="empty-state"><div style="font-size:2rem">🗡️</div><p>No stations in this theme.</p></div>';
+          return;
+        }
 
-  // Sort stations for consistent layout
-  stationIds.sort().forEach(id => {
-    const panel = findOrCreateStationPanel(id);
-  });
+        // Sort stations for consistent layout
+        stationIds.sort().forEach((id) => {
+          const panel = findOrCreateStationPanel(id);
+        });
 
-  // Update about legend
-  const legend = $('#stations-legend');
-  if (legend) {
-    legend.innerHTML = stationIds.map(id => {
-      const st = currentTheme.stations[id];
-      return `<dt style="color:var(--secondary)">${st.name}</dt><dd>${st.slots?.length || 0} slots</dd>`;
-    }).join('');
-  }
-}
+        // Update about legend
+        const legend = $("#stations-legend");
+        if (legend) {
+          legend.innerHTML = stationIds
+            .map((id) => {
+              const st = currentTheme.stations[id];
+              return `<dt style="color:var(--secondary)">${st.name}</dt><dd>${st.slots?.length || 0} slots</dd>`;
+            })
+            .join("");
+        }
+      }
 
-// --- View Switching ---
-function switchView(view) {
-  ['stations-view','log-view','about-view'].forEach(v => {
-    $(`#${v}`).style.display = v === `${view}-view` ? '' : 'none';
-  });
-  $$('.nav-tab').forEach(t => t.classList.remove('active'));
-  const activeTab = document.querySelector(`[data-view="${view}"]`);
-  if (activeTab) activeTab.classList.add('active');
+      // --- View Switching ---
+      function switchView(view) {
+        ["stations-view", "log-view", "about-view"].forEach((v) => {
+          $(`#${v}`).style.display = v === `${view}-view` ? "" : "none";
+        });
+        $$(".nav-tab").forEach((t) => t.classList.remove("active"));
+        const activeTab = document.querySelector(`[data-view="${view}"]`);
+        if (activeTab) activeTab.classList.add("active");
 
-  // Hide sidebar on log view (log takes full width)
-  $('#event-sidebar').style.display = view === 'log' ? 'none' : '';
-}
+        // Hide sidebar on log view (log takes full width)
+        $("#event-sidebar").style.display = view === "log" ? "none" : "";
+      }
 
-// --- Keyboard Shortcuts ---
-document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-  switch(e.key) {
-    case 't': $('#theme-select').focus(); break;
-    case '1': switchView('stations'); break;
-    case '2': switchView('log'); break;
-    case '3': switchView('about'); break;
-    case 'b': window.open('/builder', '_blank'); break;
-  }
-});
+      // --- Keyboard Shortcuts ---
+      document.addEventListener("keydown", (e) => {
+        if (
+          e.target.tagName === "INPUT" ||
+          e.target.tagName === "SELECT" ||
+          e.target.tagName === "TEXTAREA"
+        )
+          return;
+        switch (e.key) {
+          case "t":
+            $("#theme-select").focus();
+            break;
+          case "1":
+            switchView("stations");
+            break;
+          case "2":
+            switchView("log");
+            break;
+          case "3":
+            switchView("about");
+            break;
+          case "b":
+            window.open("/builder", "_blank");
+            break;
+        }
+      });
 
-// --- Init ---
-async function init() {
-  // Load theme list for picker
-  try {
-    const res = await fetch('/api/themes');
-    const data = await res.json();
-    themes = data.themes;
-    const sel = $('#theme-select');
-    sel.innerHTML = themes.map(t =>
-      `<option value="${t.name}">${t.label}</option>`
-    ).join('');
-    sel.value = themes[0]?.name || '';
+      // --- Init ---
+      async function init() {
+        // Load theme list for picker
+        try {
+          const res = await fetch("/api/themes");
+          const data = await res.json();
+          themes = data.themes;
+          const sel = $("#theme-select");
+          sel.innerHTML = themes
+            .map((t) => `<option value="${t.name}">${t.label}</option>`)
+            .join("");
+          sel.value = themes[0]?.name || "";
 
-    sel.addEventListener('change', () => loadTheme(sel.value));
-  } catch (err) {
-    console.error('Failed to load themes:', err);
-  }
+          sel.addEventListener("change", () => loadTheme(sel.value));
+        } catch (err) {
+          console.error("Failed to load themes:", err);
+        }
 
-  // Load default theme
-  if (themes.length > 0) {
-    await loadTheme(themes[0].name);
-  }
+        // Load default theme
+        if (themes.length > 0) {
+          await loadTheme(themes[0].name);
+        }
 
-  // View switch listeners
-  $$('.nav-tab[data-view]').forEach(tab => {
-    tab.addEventListener('click', () => switchView(tab.dataset.view));
-  });
+        // View switch listeners
+        $$(".nav-tab[data-view]").forEach((tab) => {
+          tab.addEventListener("click", () => switchView(tab.dataset.view));
+        });
 
-  // Connect SSE
-  connectSSE();
-}
+        // Connect SSE
+        connectSSE();
+      }
 
-init();
-</script>
-</body>
+      init();
+    </script>
+  </body>
 </html>

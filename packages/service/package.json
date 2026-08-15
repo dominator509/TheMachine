@@ -16,6 +16,7 @@
     }
   },
   "dependencies": {
+    "@the-machine/agent-runtime": "workspace:*",
     "@the-machine/core": "workspace:*",
     "@the-machine/observability": "workspace:*",
     "@the-machine/storage": "workspace:*",

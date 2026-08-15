@@ -35,7 +35,9 @@ export function isTempPath(targetPath) {
 }
 
 export function migrationsDir() {
-  return resolve(process.env.MACHINE_MIGRATIONS_DIR || resolve(ROOT, "packages/storage/src/migrations"));
+  return resolve(
+    process.env.MACHINE_MIGRATIONS_DIR || resolve(ROOT, "packages/storage/src/migrations"),
+  );
 }
 
 export function nextMigrationPath(rawName) {

@@ -69,15 +69,10 @@ function providerGate(
   const providers = source?.list().providers ?? [];
   const accepted = providers.some((provider) => provider.releaseDecision?.status === "accepted");
   const rejected = providers.some((provider) => provider.releaseDecision?.status === "rejected");
-  const approvalAccepted =
-    approval?.get().approval?.providerConfiguration.status === "accepted";
+  const approvalAccepted = approval?.get().approval?.providerConfiguration.status === "accepted";
   const configuredProvidersAccepted =
     providers.length === 0 || (providers.some((provider) => provider.healthy) && accepted);
-  return gate("providers", [
-    !rejected,
-    configuredProvidersAccepted,
-    approvalAccepted,
-  ], rejected);
+  return gate("providers", [!rejected, configuredProvidersAccepted, approvalAccepted], rejected);
 }
 
 function mcpGate(
@@ -89,12 +84,9 @@ function mcpGate(
   const rejected = servers.some((server) => server.releaseDecision?.status === "rejected");
   const approvalAccepted = approval?.get().approval?.mcpConfiguration.status === "accepted";
   const configuredServersAccepted =
-    servers.length === 0 || (servers.some((server) => server.healthy && server.toolCount > 0) && accepted);
-  return gate("mcp", [
-    !rejected,
-    configuredServersAccepted,
-    approvalAccepted,
-  ], rejected);
+    servers.length === 0 ||
+    (servers.some((server) => server.healthy && server.toolCount > 0) && accepted);
+  return gate("mcp", [!rejected, configuredServersAccepted, approvalAccepted], rejected);
 }
 
 function pluginGate(
@@ -107,11 +99,7 @@ function pluginGate(
   const approvalAccepted = approval?.get().approval?.pluginSandbox.status === "accepted";
   const configuredPluginsAccepted =
     plugins.length === 0 || (plugins.some((plugin) => plugin.enabled) && accepted);
-  return gate("plugin-sdk", [
-    !rejected,
-    configuredPluginsAccepted,
-    approvalAccepted,
-  ], rejected);
+  return gate("plugin-sdk", [!rejected, configuredPluginsAccepted, approvalAccepted], rejected);
 }
 
 function uiGate(
@@ -119,10 +107,11 @@ function uiGate(
   approval?: ProductionApprovalSource,
 ): ReadinessGateSummary {
   const approvalAccepted = approval?.get().approval?.sharedUIScope.status === "accepted";
-  return gate("ui-components", [
-    (source?.components.length ?? 0) > 0,
-    approvalAccepted,
-  ], source?.releaseDecision.status === "rejected");
+  return gate(
+    "ui-components",
+    [(source?.components.length ?? 0) > 0, approvalAccepted],
+    source?.releaseDecision.status === "rejected",
+  );
 }
 
 export function createReadinessHandler(deps: ReadinessDependencies = {}): ReadinessHandler {

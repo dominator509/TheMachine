@@ -70,9 +70,7 @@ export interface CircuitBreaker {
 
 // ── Implementation ──────────────────────────────────────────────────────────
 
-export function createCircuitBreaker(
-  config?: Partial<CircuitBreakerConfig>,
-): CircuitBreaker {
+export function createCircuitBreaker(config?: Partial<CircuitBreakerConfig>): CircuitBreaker {
   const cfg: CircuitBreakerConfig = {
     autoTrip: config?.autoTrip ?? true,
     maxHalfOpenFailures: config?.maxHalfOpenFailures ?? 3,
@@ -93,9 +91,10 @@ export function createCircuitBreaker(
       }
 
       if (breakerState === "CLOSED" && cfg.autoTrip) {
-        const lastSnapshot = detector.history().length > 0
-          ? detector.history()[0] // newest first
-          : null;
+        const lastSnapshot =
+          detector.history().length > 0
+            ? detector.history()[0] // newest first
+            : null;
 
         if (lastSnapshot?.anomalous) {
           breakerState = "OPEN";
@@ -110,9 +109,7 @@ export function createCircuitBreaker(
 
       if (breakerState === "HALF_OPEN") {
         // Check if a successful window has passed.
-        const lastSnapshot = detector.history().length > 0
-          ? detector.history()[0]
-          : null;
+        const lastSnapshot = detector.history().length > 0 ? detector.history()[0] : null;
 
         if (lastSnapshot && !lastSnapshot.anomalous) {
           // Recovery: transition to CLOSED.

@@ -64,10 +64,7 @@ describe("emitToGUI (fire-and-forget)", () => {
     };
 
     for (const [id, name] of Object.entries(expected)) {
-      const event = emitToGUI(
-        { agentId: Number(id) },
-        { webhookUrl: "http://test/api/pipe" },
-      );
+      const event = emitToGUI({ agentId: Number(id) }, { webhookUrl: "http://test/api/pipe" });
       expect(event.agentName).toBe(name);
     }
 
@@ -155,10 +152,7 @@ describe("emitToGUI (fire-and-forget)", () => {
     };
 
     expect(() =>
-      emitToGUI(
-        { agentId: 1 },
-        { webhookUrl: "http://nonexistent.example/api/pipe", timeout: 10 },
-      ),
+      emitToGUI({ agentId: 1 }, { webhookUrl: "http://nonexistent.example/api/pipe", timeout: 10 }),
     ).not.toThrow();
 
     restoreFetch();
