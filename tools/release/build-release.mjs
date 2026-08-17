@@ -94,6 +94,21 @@ function setTreeTimestamp(root, seconds) {
   utimesSync(root, date, date);
 }
 
+function canonicalizeMetafile(rawMetafile) {
+  const outputs = Object.entries(rawMetafile.outputs ?? {});
+  if (outputs.length !== 1) {
+    throw new Error(
+      `Expected one bundled CLI output, received ${String(outputs.length)}. Update the canonical metafile contract deliberately.`,
+    );
+  }
+  return {
+    inputs: rawMetafile.inputs ?? {},
+    outputs: {
+      "machine.js": outputs[0][1],
+    },
+  };
+}
+
 function bundledComponents(metafile) {
   const components = new Map();
   const pnpmPattern = /node_modules[\\/]\.pnpm[\\/]((?:@[^+]+\+)?[^@\\/]+)@([^\\/]+)[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/;
@@ -161,10 +176,12 @@ command(PNPM, [
   `--outfile=${machinePath}`,
   `--metafile=${metafilePath}`,
   "--external:better-sqlite3",
-  "--legal-comments=external",
+  "--legal-comments=inline",
   "--log-level=info",
 ]);
 chmodSync(machinePath, 0o755);
+const metafile = canonicalizeMetafile(JSON.parse(readFileSync(metafilePath, "utf-8")));
+writeFileSync(metafilePath, `${JSON.stringify(metafile, null, 2)}\n`);
 
 const packageJson = {
   name: "@the-machine/cli",
@@ -199,7 +216,6 @@ if (typeof packedFilename !== "string" || !existsSync(join(RELEASE_DIR, packedFi
 }
 
 writeFileSync(join(RELEASE_DIR, "version.txt"), `${version}\n`);
-const metafile = JSON.parse(readFileSync(metafilePath, "utf-8"));
 const sbom = {
   bomFormat: "CycloneDX",
   specVersion: "1.6",
