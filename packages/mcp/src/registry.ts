@@ -1,7 +1,8 @@
-// MCP registry implementation with permission checks and shell-free stdio JSON-RPC transport.
+// MCP registry implementation with approval checks and a persistent shell-free stdio client.
 
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { EntityId } from "@the-machine/core";
 import type {
   MCPInvocationOptions,
@@ -12,45 +13,25 @@ import type {
 } from "./types.js";
 
 const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
+const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
-
-interface JsonRpcResponse {
-  readonly jsonrpc?: string;
-  readonly id?: string | number;
-  readonly result?: unknown;
-  readonly error?: { readonly code?: number; readonly message?: string; readonly data?: unknown };
-}
-
-function minimalEnvironment(): NodeJS.ProcessEnv {
-  const allowed = [
-    "PATH",
-    "Path",
-    "HOME",
-    "USERPROFILE",
-    "SystemRoot",
-    "COMSPEC",
-    "PATHEXT",
-    "TMP",
-    "TEMP",
-    "SSL_CERT_FILE",
-    "NODE_EXTRA_CA_CERTS",
-  ];
-  const environment: NodeJS.ProcessEnv = {};
-  for (const name of allowed) {
-    const value = process.env[name];
-    if (value !== undefined) environment[name] = value;
-  }
-  return environment;
-}
-
-function validExecutable(value: string): boolean {
-  return value.trim().length > 0 && !value.includes("\0") && !value.includes("\n") && !value.includes("\r");
-}
-
-function validArgument(value: string): boolean {
-  return !value.includes("\0") && !value.includes("\n") && !value.includes("\r");
-}
+const STDIO_HELPER = fileURLToPath(new URL("./stdio-helper.js", import.meta.url));
+const DENIED_EXECUTABLES = new Set([
+  "bash",
+  "bash.exe",
+  "cmd",
+  "cmd.exe",
+  "dash",
+  "fish",
+  "powershell",
+  "powershell.exe",
+  "pwsh",
+  "pwsh.exe",
+  "sh",
+  "sh.exe",
+  "zsh",
+]);
 
 function permissionFor(
   permissions: readonly MCPToolPermission[],
@@ -59,28 +40,70 @@ function permissionFor(
   return permissions.find((permission) => permission.toolName === toolName) ?? null;
 }
 
-function parseJsonRpcLines(stdout: string): JsonRpcResponse[] {
-  const responses: JsonRpcResponse[] = [];
-  for (const line of stdout.split(/\r?\n/)) {
-    if (line.trim().length === 0) continue;
-    try {
-      const value = JSON.parse(line) as unknown;
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        responses.push(value as JsonRpcResponse);
-      }
-    } catch {
-      // Server log lines are ignored; required JSON-RPC responses are validated below.
-    }
+function safeEnvironment(server: MCPServerRegistration): Record<string, string> {
+  const environment: Record<string, string> = {};
+  const safeNames = [
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "NO_PROXY",
+    "PATH",
+    "PATHEXT",
+    "SSL_CERT_FILE",
+    "SystemRoot",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+  ];
+  for (const name of safeNames) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
   }
-  return responses;
+  for (const name of server.passEnvironment ?? []) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  for (const [name, value] of Object.entries(server.environment ?? {})) {
+    environment[name] = value;
+  }
+  return environment;
 }
 
-function rpcError(prefix: string, response: JsonRpcResponse): MCPInvocationResult {
-  return {
-    success: false,
-    output: "",
-    error: `${prefix}: ${response.error?.message ?? "MCP JSON-RPC error"}`,
-  };
+function validateRegistration(server: MCPServerRegistration): void {
+  if (server.transport !== "stdio") return;
+  const executable = server.endpoint.trim();
+  if (executable.length === 0 || executable.includes("\0") || /[\r\n]/.test(executable)) {
+    throw new Error(`MCP server '${server.name}' must declare one direct executable.`);
+  }
+  if (DENIED_EXECUTABLES.has(basename(executable).toLowerCase())) {
+    throw new Error(`MCP server '${server.name}' cannot use a shell executable.`);
+  }
+  for (const argument of server.args ?? []) {
+    if (argument.includes("\0") || /[\r\n]/.test(argument)) {
+      throw new Error(`MCP server '${server.name}' has an invalid argument.`);
+    }
+  }
+}
+
+function parseHelperResult(result: ReturnType<typeof spawnSync>): MCPInvocationResult {
+  const stdout = result.stdout ?? "";
+  try {
+    const parsed = JSON.parse(stdout.trim()) as {
+      success: boolean;
+      output?: string;
+      error?: string;
+    };
+    return parsed.success
+      ? { success: true, output: parsed.output ?? "null" }
+      : { success: false, output: "", error: parsed.error ?? "MCP invocation failed" };
+  } catch {
+    const detail = `${result.stderr ?? ""}${result.error ? `\n${result.error.message}` : ""}`.trim();
+    return {
+      success: false,
+      output: "",
+      error: `MCP stdio client returned no valid result${detail ? `: ${detail.slice(0, 1000)}` : "."}`,
+    };
+  }
 }
 
 export function createMCPRegistry(): MCPRegistry {
@@ -88,14 +111,7 @@ export function createMCPRegistry(): MCPRegistry {
 
   return {
     register(server: MCPServerRegistration): void {
-      if (server.transport === "stdio") {
-        if (!validExecutable(server.endpoint)) {
-          throw new Error(`MCP stdio executable is invalid for server '${server.name}'.`);
-        }
-        if ((server.args ?? []).some((argument) => !validArgument(argument))) {
-          throw new Error(`MCP stdio arguments contain a control character for server '${server.name}'.`);
-        }
-      }
+      validateRegistration(server);
       servers.set(server.id, server);
     },
 
@@ -146,6 +162,13 @@ export function createMCPRegistry(): MCPRegistry {
           error: `Tool '${toolName}' requires explicit approval on server ${server.name}`,
         };
       }
+      if (permission.requireApproval && !options.approvalId?.trim()) {
+        return {
+          success: false,
+          output: "",
+          error: `Tool '${toolName}' approval must include a durable approval ID.`,
+        };
+      }
 
       if (server.transport !== "stdio") {
         return {
@@ -155,87 +178,32 @@ export function createMCPRegistry(): MCPRegistry {
         };
       }
 
-      const protocolVersion = server.protocolVersion ?? DEFAULT_PROTOCOL_VERSION;
-      const input = [
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion,
-            capabilities: {},
-            clientInfo: { name: "the-machine", version: "0.3.0-alpha.1" },
-          },
-        }),
-        JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          method: "tools/call",
-          params: { name: toolName, arguments: args },
-        }),
-      ].join("\n");
-      if (Buffer.byteLength(input, "utf-8") > MAX_INPUT_BYTES) {
+      const timeoutMs = Math.min(Math.max(server.timeoutMs ?? DEFAULT_TIMEOUT_MS, 100), 120_000);
+      const request = JSON.stringify({
+        executable: server.endpoint,
+        args: [...(server.args ?? [])],
+        cwd: resolve(server.cwd ?? process.cwd()),
+        environment: safeEnvironment(server),
+        timeoutMs,
+        maxOutputBytes: MAX_OUTPUT_BYTES,
+        protocolVersion: server.protocolVersion ?? DEFAULT_PROTOCOL_VERSION,
+        toolName,
+        arguments: args,
+      });
+      if (Buffer.byteLength(request, "utf8") > MAX_INPUT_BYTES) {
         return { success: false, output: "", error: "MCP request exceeds the input limit" };
       }
 
-      try {
-        const timeoutMs = Math.min(Math.max(server.timeoutMs ?? 10_000, 100), 120_000);
-        const result = spawnSync(server.endpoint, [...(server.args ?? [])], {
-          cwd: server.cwd ? resolve(server.cwd) : process.cwd(),
-          env: minimalEnvironment(),
-          input: `${input}\n`,
-          encoding: "utf-8",
-          timeout: timeoutMs,
-          maxBuffer: MAX_OUTPUT_BYTES,
-          shell: false,
-          windowsHide: true,
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-        if (result.error) {
-          return {
-            success: false,
-            output: "",
-            error: `MCP stdio invocation failed: ${result.error.message}`,
-          };
-        }
-        if (result.status !== 0) {
-          return {
-            success: false,
-            output: "",
-            error: `MCP stdio server exited with ${String(result.status)}: ${(result.stderr ?? "").trim().slice(0, 500)}`,
-          };
-        }
-
-        const responses = parseJsonRpcLines(result.stdout ?? "");
-        const initialize = responses.find((response) => response.id === 1);
-        if (!initialize) {
-          return { success: false, output: "", error: "MCP server did not answer initialize" };
-        }
-        if (initialize.error) return rpcError("MCP initialize failed", initialize);
-        const initializedResult = initialize.result as { protocolVersion?: unknown } | undefined;
-        if (typeof initializedResult?.protocolVersion !== "string") {
-          return {
-            success: false,
-            output: "",
-            error: "MCP initialize response omitted protocolVersion",
-          };
-        }
-
-        const invocation = responses.find((response) => response.id === 2);
-        if (!invocation) {
-          return { success: false, output: "", error: "MCP server did not answer tools/call" };
-        }
-        if (invocation.error) return rpcError("MCP tool failed", invocation);
-        return { success: true, output: JSON.stringify(invocation.result ?? null) };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          success: false,
-          output: "",
-          error: `MCP stdio invocation failed: ${message.slice(0, 500)}`,
-        };
-      }
+      const result = spawnSync(process.execPath, [STDIO_HELPER], {
+        input: request,
+        encoding: "utf-8",
+        shell: false,
+        windowsHide: true,
+        timeout: timeoutMs + 2_500,
+        maxBuffer: MAX_OUTPUT_BYTES,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      return parseHelperResult(result);
     },
   };
 }
