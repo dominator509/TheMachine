@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   getGuiServerAccess,
+  getGuiServerConfig,
   startGuiServer,
   stopGuiServer,
 } from "@the-machine/service";
@@ -36,6 +37,13 @@ describe("GUI capability boundary", () => {
     await listening(server);
     const access = getGuiServerAccess();
     expect(access).not.toBeNull();
+
+    const publicConfig = getGuiServerConfig();
+    expect(publicConfig).toEqual(expect.objectContaining({ port, host: "127.0.0.1" }));
+    expect(Object.keys(publicConfig ?? {})).not.toContain("viewerToken");
+    expect(Object.keys(publicConfig ?? {})).not.toContain("eventToken");
+    expect(JSON.stringify(publicConfig)).not.toContain("viewer-test-capability");
+    expect(JSON.stringify(publicConfig)).not.toContain("producer-test-capability");
 
     expect((await fetch(`${base}/`)).status).toBe(403);
     expect((await fetch(`${base}/api/themes`)).status).toBe(403);
