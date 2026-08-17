@@ -37,12 +37,16 @@ interface AnthropicResponse {
   };
 }
 
+type AuthenticationStyle = "bearer" | "anthropic" | "none";
+
 function joinUrl(endpoint: string, path: string): string {
   return `${endpoint.replace(/\/+$/, "")}${path}`;
 }
 
 function redactError(message: string): string {
-  return message.replace(/Bearer\s+[A-Za-z0-9._~+/-]+/g, "Bearer [REDACTED]");
+  return message
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]+/g, "Bearer [REDACTED]")
+    .replace(/(x-api-key\s*[:=]\s*)[^\s,}]+/gi, "$1[REDACTED]");
 }
 
 function finishReason(value: string | undefined): "stop" | "length" | "error" {
@@ -51,31 +55,41 @@ function finishReason(value: string | undefined): "stop" | "length" | "error" {
   return value === undefined ? "stop" : "error";
 }
 
+function authenticationHeaders(
+  opts: ProviderAdapterOptions,
+  style: AuthenticationStyle,
+): Record<string, string> {
+  if (!opts.apiKey || style === "none") return {};
+  if (style === "anthropic") return { "x-api-key": opts.apiKey };
+  return { authorization: `Bearer ${opts.apiKey}` };
+}
+
 async function postJson(
   fetchImpl: ProviderFetch,
   url: string,
   body: unknown,
   opts: ProviderAdapterOptions,
+  authentication: AuthenticationStyle,
   extraHeaders: Record<string, string> = {},
 ): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
-  }, opts.timeoutMs ?? 30000);
+  }, opts.timeoutMs ?? 30_000);
   try {
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      ...extraHeaders,
-    };
-    if (opts.apiKey) headers["authorization"] = `Bearer ${opts.apiKey}`;
     const response = await fetchImpl(url, {
       method: "POST",
-      headers,
+      headers: {
+        "content-type": "application/json",
+        ...authenticationHeaders(opts, authentication),
+        ...extraHeaders,
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(`HTTP ${String(response.status)}: ${await response.text()}`);
+      const responseText = await response.text();
+      throw new Error(`HTTP ${String(response.status)}: ${responseText.slice(0, 2_000)}`);
     }
     return await response.json();
   } catch (err) {
@@ -102,6 +116,7 @@ export async function openAIChatCompletion(
       max_tokens: req.maxTokens,
     },
     opts,
+    "bearer",
   )) as OpenAIResponse;
   return {
     id: data.id ?? `completion-${String(Date.now())}`,
@@ -126,12 +141,13 @@ export async function anthropicCompletion(
     joinUrl(endpoint, "/v1/messages"),
     {
       model: req.model,
-      max_tokens: req.maxTokens ?? 1024,
-      messages: req.messages.filter((m) => m.role !== "system"),
-      system: req.messages.find((m) => m.role === "system")?.content,
+      max_tokens: req.maxTokens ?? 1_024,
+      messages: req.messages.filter((message) => message.role !== "system"),
+      system: req.messages.find((message) => message.role === "system")?.content,
       temperature: req.temperature,
     },
     opts,
+    "anthropic",
     { "anthropic-version": "2023-06-01" },
   )) as AnthropicResponse;
   return {
@@ -150,14 +166,23 @@ export async function anthropicCompletion(
 export async function providerHealth(
   endpoint: string,
   opts: ProviderAdapterOptions,
+  authentication: AuthenticationStyle = "bearer",
 ): Promise<ProviderHealth> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const started = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30_000);
   try {
-    const response = await fetchImpl(endpoint, { method: "GET" });
+    const response = await fetchImpl(endpoint, {
+      method: "GET",
+      headers: authenticationHeaders(opts, authentication),
+      signal: controller.signal,
+    });
     return { healthy: response.ok, latencyMs: Date.now() - started };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { healthy: false, latencyMs: Date.now() - started, error: redactError(message) };
+  } finally {
+    clearTimeout(timeout);
   }
 }
