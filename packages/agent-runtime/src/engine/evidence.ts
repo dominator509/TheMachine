@@ -1,5 +1,18 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  createHash,
+  createPublicKey,
+  sign as signData,
+  verify as verifyData,
+} from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, join } from "node:path";
 import { diffFromBase } from "./git.js";
 import { RunStateStore } from "./state.js";
@@ -12,16 +25,22 @@ const SECRET_VALUE_PATTERNS = [
   /\bgh[opurs]_[A-Za-z0-9]{20,}\b/g,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
 ] as const;
+const CHECKSUM_FILE = "checksums.sha256";
+const SIGNATURE_FILE = "checksums.sig";
 
 export interface EvidenceBundleResult {
   readonly directory: string;
   readonly checksums: Readonly<Record<string, string>>;
+  readonly signature: "created" | "missing";
 }
 
 export interface EvidenceVerification {
   readonly valid: boolean;
   readonly missing: readonly string[];
   readonly mismatched: readonly string[];
+  readonly unexpected: readonly string[];
+  readonly duplicateEntries: readonly string[];
+  readonly signature: "verified" | "missing" | "untrusted" | "invalid";
 }
 
 function sha256(contents: string | Buffer): string {
@@ -88,7 +107,8 @@ function summaryMarkdown(manifest: RunManifest): string {
     "",
     "## Integrity",
     "",
-    "Every file in this directory except `checksums.sha256` is listed in that checksum manifest.",
+    `Every payload file in this directory is listed in \`${CHECKSUM_FILE}\`.`,
+    `An optional \`${SIGNATURE_FILE}\` signs the checksum manifest when a trusted Ed25519 key is configured.`,
     "Worker output and structured records are redacted before this bundle is written.",
     "",
   ].join("\n");
@@ -103,12 +123,24 @@ function finalPatch(manifest: RunManifest): string {
   }
 }
 
+function maybeSignChecksumManifest(directory: string, checksumManifest: string): "created" | "missing" {
+  const privateKey = process.env["MACHINE_EVIDENCE_SIGNING_KEY"];
+  if (!privateKey) return "missing";
+  const signature = signData(null, Buffer.from(checksumManifest, "utf-8"), privateKey);
+  writeFileSync(join(directory, SIGNATURE_FILE), `${signature.toString("base64")}\n`, {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
+  return "created";
+}
+
 export function writeEvidenceBundle(input: {
   readonly store: RunStateStore;
   readonly manifest: RunManifest;
   readonly plan: MachinePlan;
 }): EvidenceBundleResult {
   const directory = join(input.store.runDirectory(input.manifest.runId), "evidence");
+  rmSync(directory, { recursive: true, force: true });
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const events = input.store.readEvents(input.manifest.runId);
   const approvals = input.store.readApprovals(input.manifest.runId);
@@ -135,29 +167,56 @@ export function writeEvidenceBundle(input: {
   writeEvidenceFile(directory, "patch.diff", finalPatch(input.manifest));
 
   const files = readdirSync(directory)
-    .filter((name) => name !== "checksums.sha256" && statSync(join(directory, name)).isFile())
+    .filter((name) => name !== CHECKSUM_FILE && name !== SIGNATURE_FILE)
+    .filter((name) => statSync(join(directory, name)).isFile())
     .sort();
   const checksums: Record<string, string> = {};
   for (const name of files) checksums[name] = sha256(readFileSync(join(directory, name)));
-  const manifest = files.map((name) => `${checksums[name]}  ${name}`).join("\n");
-  writeFileSync(join(directory, "checksums.sha256"), `${manifest}\n`, {
+  const checksumManifest = `${files.map((name) => `${checksums[name]}  ${name}`).join("\n")}\n`;
+  writeFileSync(join(directory, CHECKSUM_FILE), checksumManifest, {
     encoding: "utf-8",
     mode: 0o600,
   });
-  return { directory, checksums };
+  const signature = maybeSignChecksumManifest(directory, checksumManifest);
+  return { directory, checksums, signature };
+}
+
+function signatureStatus(directory: string, checksumManifest: string): EvidenceVerification["signature"] {
+  const signaturePath = join(directory, SIGNATURE_FILE);
+  if (!existsSync(signaturePath)) return "missing";
+  const verificationKey = process.env["MACHINE_EVIDENCE_VERIFY_KEY"];
+  const signingKey = process.env["MACHINE_EVIDENCE_SIGNING_KEY"];
+  if (!verificationKey && !signingKey) return "untrusted";
+  try {
+    const key = verificationKey ?? createPublicKey(signingKey as string);
+    const signature = Buffer.from(readFileSync(signaturePath, "utf-8").trim(), "base64");
+    return verifyData(null, Buffer.from(checksumManifest, "utf-8"), key, signature)
+      ? "verified"
+      : "invalid";
+  } catch {
+    return "invalid";
+  }
 }
 
 export function verifyEvidenceBundle(directory: string): EvidenceVerification {
-  const checksumPath = join(directory, "checksums.sha256");
+  const checksumPath = join(directory, CHECKSUM_FILE);
   if (!existsSync(checksumPath)) {
-    return { valid: false, missing: ["checksums.sha256"], mismatched: [] };
+    return {
+      valid: false,
+      missing: [CHECKSUM_FILE],
+      mismatched: [],
+      unexpected: [],
+      duplicateEntries: [],
+      signature: "missing",
+    };
   }
+
   const missing: string[] = [];
   const mismatched: string[] = [];
-  const lines = readFileSync(checksumPath, "utf-8")
-    .split("\n")
-    .filter((line) => line.trim().length > 0);
-  for (const line of lines) {
+  const duplicateEntries: string[] = [];
+  const checksumManifest = readFileSync(checksumPath, "utf-8");
+  const expectedNames = new Set<string>();
+  for (const line of checksumManifest.split("\n").filter((entry) => entry.trim().length > 0)) {
     const match = /^([a-f0-9]{64})\s{2}(.+)$/.exec(line);
     if (!match) {
       mismatched.push(line);
@@ -165,10 +224,15 @@ export function verifyEvidenceBundle(directory: string): EvidenceVerification {
     }
     const expected = match[1] ?? "";
     const name = match[2] ?? "";
-    if (basename(name) !== name || name.includes("..")) {
+    if (basename(name) !== name || name.includes("..") || name === CHECKSUM_FILE || name === SIGNATURE_FILE) {
       mismatched.push(name);
       continue;
     }
+    if (expectedNames.has(name)) {
+      duplicateEntries.push(name);
+      continue;
+    }
+    expectedNames.add(name);
     const filePath = join(directory, name);
     if (!existsSync(filePath)) {
       missing.push(name);
@@ -176,9 +240,26 @@ export function verifyEvidenceBundle(directory: string): EvidenceVerification {
     }
     if (sha256(readFileSync(filePath)) !== expected) mismatched.push(name);
   }
+
+  const unexpected = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.name !== CHECKSUM_FILE && entry.name !== SIGNATURE_FILE)
+    .filter((entry) => !entry.isFile() || !expectedNames.has(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+  const signature = signatureStatus(directory, checksumManifest);
+  const invalidSignature = signature === "invalid";
+
   return {
-    valid: missing.length === 0 && mismatched.length === 0,
+    valid:
+      missing.length === 0 &&
+      mismatched.length === 0 &&
+      unexpected.length === 0 &&
+      duplicateEntries.length === 0 &&
+      !invalidSignature,
     missing,
     mismatched,
+    unexpected,
+    duplicateEntries,
+    signature,
   };
 }
