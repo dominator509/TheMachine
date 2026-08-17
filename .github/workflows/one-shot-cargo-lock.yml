@@ -3,18 +3,19 @@ name: One-shot native repair
 on:
   push:
     branches:
-      - codex/agentic-runtime-kaizen-v1
+      - agent/production-readiness-remediation
     paths:
       - .github/workflows/one-shot-cargo-lock.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   repair-and-verify:
-    if: github.repository_owner == 'dominator509' && github.actor == 'dominator509'
+    if: github.repository_owner == 'dominator509'
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -117,5 +118,5 @@ jobs:
             apps/desktop/src-tauri/src/lib.rs \
             packages/service/src/handlers/repoHandler.ts
           git commit -m "fix(desktop): verify native bridge and lock Rust dependencies"
-          git pull --rebase origin codex/agentic-runtime-kaizen-v1
-          git push origin HEAD:codex/agentic-runtime-kaizen-v1
+          git pull --rebase origin agent/production-readiness-remediation
+          git push origin HEAD:agent/production-readiness-remediation
