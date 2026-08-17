@@ -85,8 +85,13 @@ function validateRegistration(server: MCPServerRegistration): void {
   }
 }
 
+function text(value: string | Buffer | null): string {
+  if (typeof value === "string") return value;
+  return value?.toString("utf8") ?? "";
+}
+
 function parseHelperResult(result: ReturnType<typeof spawnSync>): MCPInvocationResult {
-  const stdout = result.stdout ?? "";
+  const stdout = text(result.stdout);
   try {
     const parsed = JSON.parse(stdout.trim()) as {
       success: boolean;
@@ -97,7 +102,8 @@ function parseHelperResult(result: ReturnType<typeof spawnSync>): MCPInvocationR
       ? { success: true, output: parsed.output ?? "null" }
       : { success: false, output: "", error: parsed.error ?? "MCP invocation failed" };
   } catch {
-    const detail = `${result.stderr ?? ""}${result.error ? `\n${result.error.message}` : ""}`.trim();
+    const stderr = text(result.stderr);
+    const detail = `${stderr}${result.error ? `\n${result.error.message}` : ""}`.trim();
     return {
       success: false,
       output: "",
