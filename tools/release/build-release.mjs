@@ -2,7 +2,7 @@
 // Build the installable CLI release artifact and evidence metadata.
 // Native desktop installers are built separately by the OS matrix and are never represented by a JS shim.
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -16,7 +16,7 @@ import {
   utimesSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -52,6 +52,14 @@ function capture(executable, args) {
 
 function sha256(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function deterministicUuid(seed) {
+  const bytes = Buffer.from(createHash("sha256").update(seed).digest().subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function artifact(relativePath, type) {
@@ -190,18 +198,17 @@ if (typeof packedFilename !== "string" || !existsSync(join(RELEASE_DIR, packedFi
   throw new Error(`npm pack did not produce an artifact: ${packOutput}`);
 }
 
+writeFileSync(join(RELEASE_DIR, "version.txt"), `${version}\n`);
 const metafile = JSON.parse(readFileSync(metafilePath, "utf-8"));
 const sbom = {
   bomFormat: "CycloneDX",
   specVersion: "1.6",
-  serialNumber: `urn:uuid:${randomUUID()}`,
+  serialNumber: `urn:uuid:${deterministicUuid(`${candidateSha}:${version}:sbom`)}`,
   version: 1,
   metadata: {
     timestamp: createdAt,
     tools: {
-      components: [
-        { type: "application", name: "The Machine release builder", version },
-      ],
+      components: [{ type: "application", name: "The Machine release builder", version }],
     },
     component: {
       type: "application",
@@ -234,12 +241,19 @@ const provenance = {
       externalParameters: { version, candidateSha, candidateTree },
       internalParameters: { sourceDateEpoch },
       resolvedDependencies: [
-        { uri: `git+https://github.com/dominator509/TheMachine@${candidateSha}`, digest: { gitCommit: candidateSha } },
+        {
+          uri: `git+https://github.com/dominator509/TheMachine@${candidateSha}`,
+          digest: { gitCommit: candidateSha },
+        },
       ],
     },
     runDetails: {
       builder: { id: "the-machine-local-release-builder" },
-      metadata: { invocationId: randomUUID(), startedOn: createdAt, finishedOn: createdAt },
+      metadata: {
+        invocationId: `urn:uuid:${deterministicUuid(`${candidateSha}:${version}:provenance`)}`,
+        startedOn: createdAt,
+        finishedOn: createdAt,
+      },
     },
   },
   unsigned: true,
@@ -248,11 +262,12 @@ const provenance = {
 const provenancePath = join(RELEASE_DIR, "provenance.unsigned.json");
 writeFileSync(provenancePath, `${JSON.stringify(provenance, null, 2)}\n`);
 
-const releaseArtifacts = [
+const payloadArtifacts = [
   artifact(packedFilename, "npm-tarball"),
   artifact("cli.cdx.json", "sbom"),
   artifact("provenance.unsigned.json", "unsigned-provenance-metadata"),
   artifact("cli-esbuild-metafile.json", "build-metafile"),
+  artifact("version.txt", "version-marker"),
 ];
 const releaseManifest = {
   schemaVersion: 1,
@@ -265,7 +280,7 @@ const releaseManifest = {
   nodeVersion: process.version,
   platform: process.platform,
   architecture: process.arch,
-  artifacts: releaseArtifacts,
+  artifacts: payloadArtifacts,
   nativeDesktop: {
     status: "built-by-os-matrix",
     requiredManifest: "native-artifacts.json",
@@ -278,13 +293,15 @@ const releaseManifest = {
 };
 const manifestPath = join(RELEASE_DIR, "release-manifest.json");
 writeFileSync(manifestPath, `${JSON.stringify(releaseManifest, null, 2)}\n`);
-releaseArtifacts.push(artifact("release-manifest.json", "release-manifest"));
 
-const checksumLines = releaseArtifacts
-  .sort((left, right) => left.path.localeCompare(right.path))
-  .map((entry) => `${entry.sha256}  ${entry.path}`);
-writeFileSync(join(RELEASE_DIR, "checksums.sha256"), `${checksumLines.join("\n")}\n`);
-writeFileSync(join(RELEASE_DIR, "version.txt"), `${version}\n`);
+const checksumArtifacts = [
+  ...payloadArtifacts,
+  artifact("release-manifest.json", "release-manifest"),
+].sort((left, right) => left.path.localeCompare(right.path));
+writeFileSync(
+  join(RELEASE_DIR, "checksums.sha256"),
+  `${checksumArtifacts.map((entry) => `${entry.sha256}  ${entry.path}`).join("\n")}\n`,
+);
 setTreeTimestamp(RELEASE_DIR, sourceDateEpoch);
 rmSync(join(RELEASE_DIR, ".staging"), { recursive: true, force: true });
 
