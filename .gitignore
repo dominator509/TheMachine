@@ -9,6 +9,9 @@ build/
 .turbo/
 *.tsbuildinfo
 
+# Generated evidence and artifacts
+artifacts/
+
 # Environment & secrets
 .env
 .env.local
