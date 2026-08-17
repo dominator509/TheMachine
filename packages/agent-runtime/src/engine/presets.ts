@@ -11,6 +11,7 @@ export interface WorkerDescriptor {
   readonly description: string;
   readonly kind: string;
   readonly executable: string;
+  readonly invocationTemplate: readonly string[];
   readonly builtIn: boolean;
   readonly documentationUrl: string | null;
   readonly outputFormat: "jsonl" | "text" | "custom";
@@ -36,10 +37,11 @@ export interface DescribedMachineWorker extends MachineWorker {
 }
 
 interface PresetDefinition {
-  readonly descriptor: Omit<WorkerDescriptor, "executable">;
+  readonly descriptor: Omit<WorkerDescriptor, "executable" | "invocationTemplate">;
   readonly executableEnvironment: string;
   readonly defaultExecutable: string;
   readonly versionArgs: readonly string[];
+  readonly versionIdentity: RegExp;
   readonly config: (executable: string) => CliWorkerConfig;
 }
 
@@ -84,15 +86,19 @@ async function probeDefinition(
       passEnvironment: [...COMMON_PROXY_ENVIRONMENT],
     });
     const version = firstUsefulLine(result.stdout) ?? firstUsefulLine(result.stderr);
-    const available = result.exitCode === 0 && !result.timedOut && !result.cancelled;
+    const identityMatches = version !== null && definition.versionIdentity.test(version);
+    const available =
+      result.exitCode === 0 && !result.timedOut && !result.cancelled && identityMatches;
     return {
       id: descriptor.id,
       available,
       executable: descriptor.executable,
       version,
       message: available
-        ? `${descriptor.displayName} is available${version ? `: ${version}` : "."}`
-        : `${descriptor.displayName} probe failed with exit code ${String(result.exitCode)}${result.timedOut ? " (timed out)" : ""}.`,
+        ? `${descriptor.displayName} is available: ${version}`
+        : result.exitCode === 0 && !identityMatches
+          ? `${descriptor.displayName} executable returned an unexpected identity: ${version ?? "no version output"}`
+          : `${descriptor.displayName} probe failed with exit code ${String(result.exitCode)}${result.timedOut ? " (timed out)" : ""}.`,
       checkedAt,
       descriptor,
     };
@@ -111,11 +117,13 @@ async function probeDefinition(
 
 function createPresetWorker(definition: PresetDefinition): DescribedMachineWorker {
   const executable = configuredExecutable(definition);
+  const config = definition.config(executable);
   const descriptor: WorkerDescriptor = {
     ...definition.descriptor,
     executable,
+    invocationTemplate: config.args,
   };
-  const worker = createCliWorker(definition.config(executable));
+  const worker = createCliWorker(config);
   return {
     ...worker,
     descriptor,
@@ -190,7 +198,7 @@ const DEFINITIONS: readonly PresetDefinition[] = [
       id: "codex",
       displayName: "OpenAI Codex CLI",
       description:
-        "Runs Codex noninteractively with automatic review and a workspace-write sandbox.",
+        "Runs the current Codex exec interface noninteractively in its workspace-write full-auto sandbox.",
       kind: "codex-cli",
       builtIn: true,
       documentationUrl: "https://github.com/openai/codex",
@@ -199,13 +207,15 @@ const DEFINITIONS: readonly PresetDefinition[] = [
       requiredEnvironment: [],
       optionalEnvironment: CODEX_ENVIRONMENT,
       safetyNotes: [
-        "Uses Codex automatic review rather than the dangerous sandbox-bypass flag.",
-        "Runs ephemerally and leaves final validation and checkpointing to The Machine.",
+        "Uses --full-auto rather than bypassing Codex sandbox or approvals globally.",
+        "Uses -C to pin Codex to the disposable Machine worktree.",
+        "The Machine independently evaluates the resulting patch and validations because Codex exec can exit zero even when an internal command fails.",
       ],
     },
     executableEnvironment: "MACHINE_CODEX_BIN",
     defaultExecutable: "codex",
     versionArgs: ["--version"],
+    versionIdentity: /\bcodex(?:-cli)?\b/i,
     config: (executable) => {
       const model = configuredModel("MACHINE_CODEX_MODEL");
       return {
@@ -218,9 +228,9 @@ const DEFINITIONS: readonly PresetDefinition[] = [
           "--color",
           "never",
           "--ephemeral",
-          "--ignore-rules",
-          "--approve-for-me",
-          "--cd",
+          "--skip-git-repo-check",
+          "--full-auto",
+          "-C",
           "{workspace}",
           ...(model ? ["--model", model] : []),
           "{prompt}",
@@ -245,12 +255,13 @@ const DEFINITIONS: readonly PresetDefinition[] = [
       optionalEnvironment: CLAUDE_ENVIRONMENT,
       safetyNotes: [
         "Never enables dangerously-skip-permissions.",
-        "Allows repository reads and edits while denying network tools and Git history mutation commands.",
+        "Allows repository reads and edits while denying web tools and Git history mutation commands.",
       ],
     },
     executableEnvironment: "MACHINE_CLAUDE_BIN",
     defaultExecutable: "claude",
     versionArgs: ["--version"],
+    versionIdentity: /\bclaude\b/i,
     config: (executable) => {
       const model = configuredModel("MACHINE_CLAUDE_MODEL");
       const maxTurns = process.env["MACHINE_CLAUDE_MAX_TURNS"]?.trim() || "80";
@@ -298,7 +309,7 @@ const DEFINITIONS: readonly PresetDefinition[] = [
       id: "aider",
       displayName: "Aider",
       description:
-        "Runs one scripted Aider edit pass while disabling Aider-owned commits and test execution.",
+        "Runs one scripted Aider edit pass while disabling Aider-owned commits, tests, and linting.",
       kind: "aider-cli",
       builtIn: true,
       documentationUrl: "https://aider.chat/docs/scripting.html",
@@ -307,6 +318,7 @@ const DEFINITIONS: readonly PresetDefinition[] = [
       requiredEnvironment: [],
       optionalEnvironment: AIDER_ENVIRONMENT,
       safetyNotes: [
+        "Uses the documented --yes scripting flag rather than an unverified alias.",
         "Disables Aider auto-commits, dirty commits, attribution changes, auto-lint, and auto-test.",
         "The Machine remains the sole checkpoint and deterministic-validation authority.",
       ],
@@ -314,6 +326,7 @@ const DEFINITIONS: readonly PresetDefinition[] = [
     executableEnvironment: "MACHINE_AIDER_BIN",
     defaultExecutable: "aider",
     versionArgs: ["--version"],
+    versionIdentity: /\baider\b/i,
     config: (executable) => {
       const model = configuredModel("MACHINE_AIDER_MODEL");
       return {
@@ -323,7 +336,7 @@ const DEFINITIONS: readonly PresetDefinition[] = [
         args: [
           "--message-file",
           "{promptFile}",
-          "--yes-always",
+          "--yes",
           "--no-stream",
           "--no-pretty",
           "--no-auto-commits",
@@ -335,9 +348,7 @@ const DEFINITIONS: readonly PresetDefinition[] = [
           "--no-auto-lint",
           "--no-auto-test",
           "--no-check-update",
-          "--disable-playwright",
           "--no-suggest-shell-commands",
-          "--skip-sanity-check-repo",
           ...(model ? ["--model", model] : []),
         ],
         timeoutMs: 3_600_000,
@@ -360,18 +371,20 @@ const DEFINITIONS: readonly PresetDefinition[] = [
       requiredEnvironment: [],
       optionalEnvironment: OPENHANDS_ENVIRONMENT,
       safetyNotes: [
-        "OpenHands headless mode auto-approves its internal actions, so it is confined to the run worktree through SANDBOX_VOLUMES.",
-        "Native Windows users should run this preset through WSL with Docker available.",
+        "Headless mode always approves OpenHands actions, so Docker sandbox availability is a prerequisite.",
+        "--override-with-envs is required for LLM_API_KEY, LLM_MODEL, and LLM_BASE_URL to override stored settings.",
+        "Only the disposable run worktree is mounted read-write through SANDBOX_VOLUMES.",
       ],
     },
     executableEnvironment: "MACHINE_OPENHANDS_BIN",
     defaultExecutable: "openhands",
     versionArgs: ["--version"],
+    versionIdentity: /\bopenhands\b/i,
     config: (executable) => ({
       id: "openhands",
       kind: "cli",
       executable,
-      args: ["--headless", "--json", "--file", "{promptFile}"],
+      args: ["--headless", "--json", "--override-with-envs", "--file", "{promptFile}"],
       timeoutMs: 3_600_000,
       maxOutputBytes: 32 * 1024 * 1024,
       environment: {
@@ -399,6 +412,7 @@ export function describeWorker(worker: MachineWorker): WorkerDescriptor {
     description: "Custom Machine worker supplied by a plan or embedding application.",
     kind: worker.kind,
     executable: "custom",
+    invocationTemplate: [],
     builtIn: false,
     documentationUrl: null,
     outputFormat: "custom",
