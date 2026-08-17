@@ -25,7 +25,7 @@ export function createAnthropicAdapter(
     },
 
     async health(): Promise<ProviderHealth> {
-      return providerHealth(endpoint, opts);
+      return providerHealth(endpoint, opts, "anthropic");
     },
   };
 }
