@@ -29,7 +29,10 @@
     }
   },
   "bundle": {
-    "active": false,
-    "targets": "all"
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": false,
+    "shortDescription": "Durable local-first control plane for coding agents",
+    "longDescription": "The Machine supervises isolated, restartable coding-agent delivery runs with approvals, policy gates, deterministic validation, evidence, and recovery."
   }
 }
