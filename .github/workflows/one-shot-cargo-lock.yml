@@ -6,6 +6,18 @@ on:
       - agent/production-readiness-remediation
     paths:
       - .github/workflows/one-shot-cargo-lock.yml
+      - apps/desktop/src-tauri/Cargo.toml
+      - apps/desktop/src-tauri/src/lib.rs
+      - packages/service/src/handlers/repoHandler.ts
+      - tests/unit/plugin-sdk.unit.test.ts
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-cargo-lock.yml
+      - apps/desktop/src-tauri/Cargo.toml
+      - apps/desktop/src-tauri/src/lib.rs
+      - packages/service/src/handlers/repoHandler.ts
+      - tests/unit/plugin-sdk.unit.test.ts
   workflow_dispatch:
 
 permissions:
@@ -13,7 +25,7 @@ permissions:
 
 jobs:
   repair-and-verify:
-    if: github.repository_owner == 'dominator509'
+    if: github.repository_owner == 'dominator509' && github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
@@ -22,6 +34,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: true
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Commit deterministic source migrations first
         run: |
@@ -115,6 +128,7 @@ jobs:
         run: cargo generate-lockfile --manifest-path apps/desktop/src-tauri/Cargo.toml
 
       - name: Commit generated lock and formatting
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
           git config user.name "The Machine CI"
           git config user.email "ci@themachine.dev"
