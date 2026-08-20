@@ -1,6 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readlinkSync,
+  rmSync,
+} from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { buildSafeEnvironment } from "../process.js";
 
 const GIT_OUTPUT_LIMIT = 32 * 1024 * 1024;
@@ -23,6 +29,8 @@ export interface StagedPatch {
   readonly changedFiles: readonly string[];
   readonly patch: string;
   readonly patchBytes: number;
+  readonly ignoredFiles?: readonly string[];
+  readonly unsafeSymlinks?: readonly string[];
 }
 
 export class GitCommandError extends Error {
@@ -124,11 +132,50 @@ function parseNullSeparated(output: string): string[] {
     .map((value) => value.replaceAll("\\", "/"));
 }
 
+function listIgnoredFiles(worktreePath: string): string[] {
+  return parseNullSeparated(
+    runGit(worktreePath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"])
+      .stdout,
+  );
+}
+
+function pathEscapes(rootPath: string, candidatePath: string): boolean {
+  const rel = relative(resolve(rootPath), resolve(candidatePath));
+  return rel.startsWith("..") || isAbsolute(rel);
+}
+
+function unsafeSymlinks(worktreePath: string, changedFiles: readonly string[]): string[] {
+  const unsafe: string[] = [];
+  for (const filePath of changedFiles) {
+    const absolutePath = resolve(worktreePath, filePath);
+    try {
+      if (!lstatSync(absolutePath).isSymbolicLink()) continue;
+      const target = readlinkSync(absolutePath);
+      const resolvedTarget = resolve(dirname(absolutePath), target);
+      const relativeTarget = relative(resolve(worktreePath), resolvedTarget).replaceAll("\\", "/");
+      if (
+        pathEscapes(worktreePath, resolvedTarget) ||
+        relativeTarget === ".git" ||
+        relativeTarget.startsWith(".git/") ||
+        relativeTarget === ".machine" ||
+        relativeTarget.startsWith(".machine/")
+      ) {
+        unsafe.push(filePath.replaceAll("\\", "/"));
+      }
+    } catch {
+      // Deleted and broken paths are represented in the Git patch and do not expose a live target.
+    }
+  }
+  return unsafe.sort();
+}
+
 export function stageAndInspect(worktreePath: string): StagedPatch {
   runGit(worktreePath, ["add", "-A", "--", "."]);
   const changedFiles = parseNullSeparated(
     runGit(worktreePath, ["diff", "--cached", "--name-only", "-z", "HEAD"]).stdout,
   );
+  const ignoredFiles = listIgnoredFiles(worktreePath);
+  const unsafeLinks = unsafeSymlinks(worktreePath, changedFiles);
   const patch = runGit(worktreePath, [
     "diff",
     "--cached",
@@ -136,20 +183,30 @@ export function stageAndInspect(worktreePath: string): StagedPatch {
     "--no-ext-diff",
     "HEAD",
   ]).stdout;
+
+  // Ignored and untracked residue is never allowed to influence policy, validation, or a
+  // later fallback worker. Capture it for policy evidence, then remove it before execution continues.
+  if (ignoredFiles.length > 0) runGit(worktreePath, ["clean", "-ffdx"]);
+
   return {
     changedFiles,
     patch,
     patchBytes: Buffer.byteLength(patch, "utf-8"),
+    ignoredFiles,
+    unsafeSymlinks: unsafeLinks,
   };
 }
 
 export function resetWorktree(worktreePath: string): void {
   runGit(worktreePath, ["reset", "--hard", "HEAD"]);
-  runGit(worktreePath, ["clean", "-fd"]);
+  runGit(worktreePath, ["clean", "-ffdx"]);
 }
 
 export function worktreeIsClean(worktreePath: string): boolean {
-  return runGit(worktreePath, ["status", "--porcelain=v1"]).stdout.trim().length === 0;
+  return (
+    runGit(worktreePath, ["status", "--porcelain=v1", "--untracked-files=all"]).stdout.trim()
+      .length === 0 && listIgnoredFiles(worktreePath).length === 0
+  );
 }
 
 export function currentCommit(worktreePath: string): string {

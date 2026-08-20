@@ -16,6 +16,8 @@ export interface MCPResponse {
   readonly tools: string[];
   readonly toolCount: number;
   readonly healthy: boolean;
+  readonly healthCheckedAt?: string;
+  readonly healthEvidence?: string;
   readonly releaseDecision?: ReleaseDecision;
 }
 

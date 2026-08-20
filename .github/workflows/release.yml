@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (for example 0.2.0-rc.1)"
+        description: "Exact package version (for example 0.3.0-alpha.1)"
         required: true
         type: string
       dry_run:
-        description: "Build and verify without tagging"
+        description: "Build and verify without tagging or publishing"
         required: false
         default: "true"
         type: choice
@@ -16,79 +16,206 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: machine-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  RELEASE_VERSION: ${{ inputs.version }}
 
 jobs:
-  build:
-    name: Build Release Candidate
+  verify:
+    name: Verify candidate and build portable CLI
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-
+    timeout-minutes: 150
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - name: Require workflow version to match source identity
+        run: >-
+          node -e "const expected=require('./package.json').version;
+          if (process.env.RELEASE_VERSION !== expected) {
+          console.error('Release input '+process.env.RELEASE_VERSION+' does not match package '+expected);
+          process.exit(1); }"
+      - run: pnpm run version:check
+      - name: Execute complete CI readiness profile
+        run: >-
+          node tools/readiness/production-readiness-check.mjs
+          --profile ci
+          --output artifacts/readiness/READINESS_EVIDENCE.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22.13.1"
-
-      - name: Install pinned pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.6.0
-          run_install: false
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Full verification
-        run: ./scripts/verify.sh
-
-      - name: Benchmark smoke suite
-        run: pnpm run benchmark:smoke
-
-      - name: Build release artifacts
-        run: pnpm run build:release
-
-      - name: Smoke test release artifacts
-        run: ./scripts/smoke-test.sh
-
-      - name: Production readiness
-        run: pnpm run production:readiness
-
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ inputs.version }}
+          name: release-cli-${{ github.sha }}
           path: release/
           if-no-files-found: error
           retention-days: 30
-
-      - name: Upload benchmark report
-        uses: actions/upload-artifact@v4
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: benchmark-${{ inputs.version }}
+          name: release-readiness-base-${{ github.sha }}
+          path: artifacts/readiness/
+          if-no-files-found: warn
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-benchmark-${{ github.sha }}
           path: benchmark-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+  native:
+    name: Native installer ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-14]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+      - name: Install Linux WebKit dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            pkg-config \
+            libssl-dev
+      - name: Require committed Cargo.lock
+        run: >-
+          node -e "if (!require('node:fs').existsSync('apps/desktop/src-tauri/Cargo.lock')) {
+          console.error('apps/desktop/src-tauri/Cargo.lock is required for release'); process.exit(1); }"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run version:check
+      - run: pnpm --filter @the-machine/desktop build
+      - run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+      - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+      - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - run: pnpm --filter @the-machine/desktop tauri build
+      - name: Collect digest-bound native installers
+        run: >-
+          node tools/release/collect-native-artifacts.mjs
+          --source apps/desktop/src-tauri/target/release/bundle
+          --output artifacts/native
+          --platform "${{ runner.os }}"
+          --arch "${{ runner.arch }}"
+          --candidate "${{ github.sha }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          path: artifacts/native/
           if-no-files-found: error
           retention-days: 30
 
-      - name: Dry-run result
-        if: inputs.dry_run == 'true'
-        run: echo "Dry run complete — verification, benchmarks, release build, smoke, and readiness passed."
-
-      - name: Validate release version
-        if: inputs.dry_run == 'false'
+  assemble:
+    name: Assemble and prove exact release artifact
+    needs: [verify, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-cli-${{ github.sha }}
+          path: release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-readiness-base-${{ github.sha }}
+          path: artifacts/readiness
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: native-*-${{ github.sha }}
+          path: native-downloads
+          merge-multiple: false
+      - name: Assemble and verify all native manifests
+        run: >-
+          node tools/release/assemble-native-artifacts.mjs
+          --input native-downloads
+          --output release
+          --candidate "${{ github.sha }}"
+      - name: Verify release-only readiness gates against prior execution evidence
+        run: >-
+          node tools/readiness/production-readiness-check.mjs
+          --profile release
+          --evidence artifacts/readiness/READINESS_EVIDENCE.json
+          --output artifacts/readiness/RELEASE_READINESS_EVIDENCE.json
+      - name: Create deterministic release archive
         env:
-          VERSION: ${{ inputs.version }}
+          CANDIDATE_SHA: ${{ github.sha }}
         run: |
-          node -e "if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(process.env.VERSION)) process.exit(1)"
-
-      - name: Tag release candidate
+          mkdir -p dist
+          SHORT_SHA="${CANDIDATE_SHA:0:12}"
+          ARCHIVE="dist/the-machine-${RELEASE_VERSION}-${SHORT_SHA}.tar.gz"
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -cf - release | gzip -n > "$ARCHIVE"
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+      - name: Clean-room execute the exact archive
+        run: |
+          CLEANROOM="$RUNNER_TEMP/the-machine-cleanroom"
+          rm -rf "$CLEANROOM"
+          mkdir -p "$CLEANROOM" "$RUNNER_TEMP/the-machine-home"
+          tar -xzf dist/*.tar.gz -C "$CLEANROOM"
+          cd "$CLEANROOM"
+          env -i HOME="$RUNNER_TEMP/the-machine-home" PATH="$PATH" node release/machine.js version
+          env -i HOME="$RUNNER_TEMP/the-machine-home" PATH="$PATH" node release/machine.js health
+      - name: Attest exact archive provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+        with:
+          subject-path: dist/*.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: exact-release-${{ inputs.version }}-${{ github.sha }}
+          path: |
+            dist/
+            release/
+            artifacts/readiness/RELEASE_READINESS_EVIDENCE.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Tag the exact tested candidate
         if: inputs.dry_run == 'false'
         env:
-          VERSION: ${{ inputs.version }}
+          CANDIDATE_SHA: ${{ github.sha }}
         run: |
           git config user.name "The Machine CI"
           git config user.email "ci@themachine.dev"
-          git tag -a "v${VERSION}" -m "Release candidate v${VERSION}"
-          git push origin "v${VERSION}"
+          git tag -a "v${RELEASE_VERSION}" "$CANDIDATE_SHA" -m "The Machine v${RELEASE_VERSION}"
+          git push origin "v${RELEASE_VERSION}"
+      - name: Publish a draft GitHub release
+        if: inputs.dry_run == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "v${RELEASE_VERSION}"
+          dist/*.tar.gz
+          dist/*.sha256
+          --draft
+          --verify-tag
+          --title "The Machine v${RELEASE_VERSION}"
+          --notes "Exact artifact verified at commit ${{ github.sha }}. Promotion remains subject to human and external gates documented in the release readiness evidence."

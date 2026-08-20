@@ -8,6 +8,13 @@ interface PackageManifest {
   readonly packageManager?: string;
 }
 
+const KNOWN_PACKAGE_MANAGERS = new Set<RepoResponse["packageManager"]>([
+  "pnpm",
+  "npm",
+  "yarn",
+  "bun",
+]);
+
 function gitValue(rootPath: string, args: readonly string[]): string | null {
   const result = spawnSync("git", [...args], {
     cwd: rootPath,
@@ -21,15 +28,10 @@ function gitValue(rootPath: string, args: readonly string[]): string | null {
     : null;
 }
 
-function knownPackageManager(
-  value: string | undefined,
-): RepoResponse["packageManager"] | null {
-  return value === "pnpm" ||
-    value === "npm" ||
-    value === "yarn" ||
-    value === "bun"
-    ? value
-    : null;
+function knownPackageManager(value: string | undefined): RepoResponse["packageManager"] | null {
+  if (!value) return null;
+  const candidate = value as RepoResponse["packageManager"];
+  return KNOWN_PACKAGE_MANAGERS.has(candidate) ? candidate : null;
 }
 
 function detectedPackageManager(
@@ -43,8 +45,9 @@ function detectedPackageManager(
   if (
     existsSync(join(rootPath, "bun.lock")) ||
     existsSync(join(rootPath, "bun.lockb"))
-  )
+  ) {
     return "bun";
+  }
   if (existsSync(join(rootPath, "package-lock.json"))) return "npm";
   return "unknown";
 }

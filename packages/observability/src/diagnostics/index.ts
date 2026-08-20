@@ -3,8 +3,6 @@
 
 import { redactText } from "@the-machine/security";
 
-// ── Types ───────────────────────────────────────────────────────────────────
-
 export interface DiagnosticConfig {
   readonly platform: string;
   readonly version: string;
@@ -35,132 +33,131 @@ export interface DiagnosticBundle {
   readonly sections: DiagnosticBundleSection[];
 }
 
-// ── Redaction helpers ────────────────────────────────────────────────────────
+const MAX_DEPTH = 20;
+const MAX_NODES = 10_000;
+const MAX_ARRAY_ITEMS = 1_000;
+const MAX_OBJECT_KEYS = 1_000;
+const MAX_STRING_LENGTH = 65_536;
+const SENSITIVE_KEY_PATTERN =
+  /(?:api.?key|token|secret|password|credential|authorization|auth.?header|private.?key|seed.?phrase|mcp.?credential|plugin.?secret)/i;
 
-const SENSITIVE_KEYS = new Set<string>([
-  "api_key",
-  "apiKey",
-  "apikey",
-  "token",
-  "secret",
-  "password",
-  "credential",
-  "authorization",
-  "auth_header",
-  "private_key",
-  "privateKey",
-  "mcp_credential",
-  "plugin_secret",
-]);
-
-function shouldRedactValue(key: string): boolean {
-  return SENSITIVE_KEYS.has(key);
+interface RedactionState {
+  nodes: number;
+  applied: boolean;
+  readonly seen: WeakSet<object>;
 }
 
-function redactRecord(
-  record: Record<string, unknown>,
-  depth = 0,
-): { redacted: Record<string, unknown>; applied: boolean } {
-  if (depth > 5) return { redacted: record, applied: false };
-  let applied = false;
-  const result: Record<string, unknown> = {};
+function redactString(value: string, state: RedactionState): string {
+  const bounded =
+    value.length > MAX_STRING_LENGTH
+      ? `${value.slice(0, MAX_STRING_LENGTH)}[TRUNCATED:STRING]`
+      : value;
+  if (bounded !== value) state.applied = true;
+  const result = redactText(bounded);
+  if (result.matchedPatterns.length > 0) state.applied = true;
+  return result.redacted;
+}
 
-  for (const [key, value] of Object.entries(record)) {
-    if (shouldRedactValue(key) && typeof value === "string") {
-      const r = redactText(value);
-      if (r.matchedPatterns.length > 0) {
-        applied = true;
-        result[key] = r.redacted;
-      } else {
-        // Even if no known pattern matched, mask the value entirely
-        applied = true;
-        result[key] = "[REDACTED]";
-      }
-    } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      const nested = redactRecord(value as Record<string, unknown>, depth + 1);
-      if (nested.applied) applied = true;
-      result[key] = nested.redacted;
-    } else if (Array.isArray(value)) {
-      result[key] = value.map((item: unknown): unknown => {
-        if (item !== null && typeof item === "object") {
-          const nested = redactRecord(item as Record<string, unknown>, depth + 1);
-          if (nested.applied) applied = true;
-          return nested.redacted;
-        }
-        // Redact strings in arrays that look like secrets
-        if (typeof item === "string") {
-          const r = redactText(item);
-          if (r.matchedPatterns.length > 0) {
-            applied = true;
-            return r.redacted;
-          }
-        }
-        return item;
-      });
-    } else if (typeof value === "string") {
-      // Check plain strings for secret patterns
-      const r = redactText(value);
-      if (r.matchedPatterns.length > 0) {
-        applied = true;
-        result[key] = r.redacted;
-      } else {
-        result[key] = value;
-      }
-    } else {
-      result[key] = value;
+function redactValue(
+  value: unknown,
+  state: RedactionState,
+  depth: number,
+  key: string | null,
+): unknown {
+  if (key !== null && SENSITIVE_KEY_PATTERN.test(key)) {
+    state.applied = true;
+    return "[REDACTED]";
+  }
+  if (typeof value === "string") return redactString(value, state);
+  if (value === null || typeof value !== "object") return value;
+  if (depth >= MAX_DEPTH) {
+    state.applied = true;
+    return "[TRUNCATED:DEPTH]";
+  }
+  state.nodes += 1;
+  if (state.nodes > MAX_NODES) {
+    state.applied = true;
+    return "[TRUNCATED:NODES]";
+  }
+  if (state.seen.has(value)) {
+    state.applied = true;
+    return "[CIRCULAR]";
+  }
+  state.seen.add(value);
+
+  if (Array.isArray(value)) {
+    const items = value
+      .slice(0, MAX_ARRAY_ITEMS)
+      .map((item) => redactValue(item, state, depth + 1, null));
+    if (value.length > MAX_ARRAY_ITEMS) {
+      items.push(`[TRUNCATED:${String(value.length - MAX_ARRAY_ITEMS)}_ITEMS]`);
+      state.applied = true;
     }
+    return items;
   }
 
-  return { redacted: result, applied };
+  const result: Record<string, unknown> = {};
+  const entries = Object.entries(value as Record<string, unknown>);
+  for (const [entryKey, entryValue] of entries.slice(0, MAX_OBJECT_KEYS)) {
+    result[entryKey] = redactValue(entryValue, state, depth + 1, entryKey);
+  }
+  if (entries.length > MAX_OBJECT_KEYS) {
+    result["__truncatedKeys"] = entries.length - MAX_OBJECT_KEYS;
+    state.applied = true;
+  }
+  return result;
 }
 
-// ── Bundle Factory ──────────────────────────────────────────────────────────
+function redactRecord(record: Record<string, unknown>): {
+  redacted: Record<string, unknown>;
+  applied: boolean;
+} {
+  const state: RedactionState = { nodes: 0, applied: false, seen: new WeakSet<object>() };
+  const redacted = redactValue(record, state, 0, null);
+  return {
+    redacted:
+      redacted !== null && typeof redacted === "object" && !Array.isArray(redacted)
+        ? (redacted as Record<string, unknown>)
+        : { value: redacted },
+    applied: state.applied,
+  };
+}
 
 export function createDiagnosticBundle(config: DiagnosticConfig): DiagnosticBundle {
   const uptimeMs = Date.now() - config.startTime;
-
-  const sections: DiagnosticBundleSection[] = [];
-
-  // System info section
-  const systemSection: DiagnosticBundleSection = {
-    label: "system",
-    data: {
-      nodeVersion: config.nodeVersion,
-      platformArch: config.platformArch,
-      osInfo: config.osInfo,
+  const sections: DiagnosticBundleSection[] = [
+    {
+      label: "system",
+      data: {
+        nodeVersion: config.nodeVersion,
+        platformArch: config.platformArch,
+        osInfo: config.osInfo,
+      },
+      redacted: false,
     },
-    redacted: false,
-  };
-  sections.push(systemSection);
-
-  // Version info
-  const versionSection: DiagnosticBundleSection = {
-    label: "version",
-    data: {
-      platform: config.platform,
-      version: config.version,
-      uptimeMs,
-      generatedAt: new Date().toISOString(),
+    {
+      label: "version",
+      data: {
+        platform: config.platform,
+        version: config.version,
+        uptimeMs,
+        generatedAt: new Date().toISOString(),
+      },
+      redacted: false,
     },
-    redacted: false,
-  };
-  sections.push(versionSection);
-
-  // Profile counts
-  const profileSection: DiagnosticBundleSection = {
-    label: "profiles",
-    data: {
-      providerCount: config.providerCount ?? 0,
-      mcpServerCount: config.mcpServerCount ?? 0,
-      pluginCount: config.pluginCount ?? 0,
+    {
+      label: "profiles",
+      data: {
+        providerCount: config.providerCount ?? 0,
+        mcpServerCount: config.mcpServerCount ?? 0,
+        pluginCount: config.pluginCount ?? 0,
+      },
+      redacted: false,
     },
-    redacted: false,
-  };
-  sections.push(profileSection);
+  ];
 
-  // Redact the full bundle
   let bundleApplied = false;
-  const redactedSections: DiagnosticBundleSection[] = sections.map((section) => {
+  const redactedSections = sections.map((section) => {
     const { redacted, applied } = redactRecord(section.data);
     if (applied) bundleApplied = true;
     return { ...section, data: redacted, redacted: applied };
@@ -179,27 +176,25 @@ export function createDiagnosticBundle(config: DiagnosticConfig): DiagnosticBund
   };
 }
 
-// ── Raw Data Export (primarily for testing / direct use) ────────────────────
-
 export function exportDiagnosticBundle(
   config: DiagnosticConfig,
   extraData?: Record<string, unknown>,
 ): DiagnosticBundle {
   const bundle = createDiagnosticBundle(config);
+  if (!extraData || Object.keys(extraData).length === 0) return bundle;
 
-  if (extraData && Object.keys(extraData).length > 0) {
-    const { redacted, applied } = redactRecord(extraData);
-    bundle.sections.push({
+  const { redacted, applied } = redactRecord(extraData);
+  const sections = [
+    ...bundle.sections,
+    {
       label: "extra",
       data: redacted,
       redacted: applied,
-    });
-    return {
-      ...bundle,
-      redactionApplied: applied ? true : bundle.redactionApplied,
-      sections: bundle.sections,
-    };
-  }
-
-  return bundle;
+    },
+  ];
+  return {
+    ...bundle,
+    redactionApplied: applied || bundle.redactionApplied,
+    sections,
+  };
 }

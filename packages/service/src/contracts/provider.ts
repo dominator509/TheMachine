@@ -16,6 +16,8 @@ export interface ProviderResponse {
   readonly models: string[];
   readonly timeoutMs: number;
   readonly healthy: boolean;
+  readonly healthCheckedAt?: string;
+  readonly healthEvidence?: string;
   readonly releaseDecision?: ReleaseDecision;
 }
 

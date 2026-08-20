@@ -20,7 +20,7 @@ describe("ServiceClient", () => {
       check: () => ({
         status: "ok",
         platform: "test",
-        version: "0.1.0",
+        version: "0.3.0-alpha.1",
         uptimeMs: 0,
         checks: { core: true },
       }),
@@ -41,7 +41,7 @@ describe("ServiceClient", () => {
         workspaceId: "ws-1",
         rootPath: "/repo",
         packageManager: "pnpm",
-        nodeVersion: "20.0.0",
+        nodeVersion: "22.13.1",
         hasPackageJson: true,
         hasGit: true,
         branch: "main",
@@ -97,8 +97,9 @@ describe("ServiceClient", () => {
         endpoint,
         models,
         timeoutMs,
-        healthy: true,
+        healthy: false,
       }),
+      recordHealth: () => null,
       acceptRelease: () => null,
     };
 
@@ -112,8 +113,9 @@ describe("ServiceClient", () => {
         endpoint,
         tools,
         toolCount: tools.length,
-        healthy: true,
+        healthy: false,
       }),
+      recordHealth: () => null,
       acceptRelease: () => null,
     };
 
@@ -126,8 +128,9 @@ describe("ServiceClient", () => {
         version,
         entryPoint,
         permissionCount,
-        enabled: true,
+        enabled: false,
       }),
+      recordActivation: () => null,
       acceptRelease: () => null,
     };
 
@@ -140,7 +143,7 @@ describe("ServiceClient", () => {
     const mockReadiness: ReadinessHandler = {
       check: () => ({
         workspaceId: "ws-1",
-        overall: "ready",
+        overall: "degraded",
         gates: [],
       }),
     };
@@ -159,7 +162,6 @@ describe("ServiceClient", () => {
       readiness: mockReadiness,
     });
 
-    // Verify every handler domain is accessible
     expect(client.health.check({}).status).toBe("ok");
     expect(client.workspace.get({}).path).toBe("/repo");
     expect(client.repo.discover({ workspaceId: "ws-1" }).packageManager).toBe("pnpm");
@@ -170,11 +172,11 @@ describe("ServiceClient", () => {
     ).toBe(true);
     expect(
       client.provider.register("p-1", "t1", "local", "http://localhost", ["m1"], 5000).healthy,
-    ).toBe(true);
+    ).toBe(false);
     expect(client.mcp.register("m-1", "svc", "stdio", "/tmp/sock", ["tool-a"]).toolCount).toBe(1);
-    expect(client.plugin.register("pl-1", "plug", "1.0.0", "entry.mjs", 2).enabled).toBe(true);
+    expect(client.plugin.register("pl-1", "plug", "1.0.0", "entry.mjs", 2).enabled).toBe(false);
     expect(client.approval.get().accepted).toBe(false);
-    expect(client.readiness.check({ workspaceId: "ws-1" }).overall).toBe("ready");
+    expect(client.readiness.check({ workspaceId: "ws-1" }).overall).toBe("degraded");
   });
 
   it("returned client shape is frozen composition", () => {
@@ -182,7 +184,7 @@ describe("ServiceClient", () => {
       check: () => ({
         status: "ok",
         platform: "test",
-        version: "0.1.0",
+        version: "0.3.0-alpha.1",
         uptimeMs: 0,
         checks: {},
       }),
@@ -199,7 +201,7 @@ describe("ServiceClient", () => {
           workspaceId: "",
           rootPath: "",
           packageManager: "pnpm",
-          nodeVersion: "20.0.0",
+          nodeVersion: "22.13.1",
           hasPackageJson: false,
           hasGit: false,
           branch: null,
@@ -251,8 +253,9 @@ describe("ServiceClient", () => {
           endpoint: "",
           models: [],
           timeoutMs: 5000,
-          healthy: true,
+          healthy: false,
         }),
+        recordHealth: () => null,
         acceptRelease: () => null,
       },
       mcp: {
@@ -265,8 +268,9 @@ describe("ServiceClient", () => {
           endpoint: "",
           tools: [],
           toolCount: 0,
-          healthy: true,
+          healthy: false,
         }),
+        recordHealth: () => null,
         acceptRelease: () => null,
       },
       plugin: {
@@ -278,8 +282,9 @@ describe("ServiceClient", () => {
           version: "0.0.0",
           entryPoint: "",
           permissionCount: 0,
-          enabled: true,
+          enabled: false,
         }),
+        recordActivation: () => null,
         acceptRelease: () => null,
       },
       approval: {
@@ -287,7 +292,7 @@ describe("ServiceClient", () => {
         record: () => ({ approval: null, accepted: true, missing: [] }),
         clear: () => ({ approval: null, accepted: false, missing: [] }),
       },
-      readiness: { check: () => ({ workspaceId: "", overall: "ready", gates: [] }) },
+      readiness: { check: () => ({ workspaceId: "", overall: "degraded", gates: [] }) },
     });
 
     expect(client.health).toBe(mockHealth);

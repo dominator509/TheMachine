@@ -1,25 +1,123 @@
-// MCP registry implementation with permission checks and stdio JSON-RPC transport.
+// MCP registry implementation with approval checks and a persistent shell-free stdio client.
 
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { basename, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { EntityId } from "@the-machine/core";
 import type {
+  MCPInvocationOptions,
+  MCPInvocationResult,
   MCPRegistry,
   MCPServerRegistration,
-  MCPInvocationResult,
   MCPToolPermission,
 } from "./types.js";
+
+const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
+const DEFAULT_TIMEOUT_MS = 10_000;
+const MAX_INPUT_BYTES = 1024 * 1024;
+const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+const STDIO_HELPER = fileURLToPath(new URL("./stdio-helper.js", import.meta.url));
+const DENIED_EXECUTABLES = new Set([
+  "bash",
+  "bash.exe",
+  "cmd",
+  "cmd.exe",
+  "dash",
+  "fish",
+  "powershell",
+  "powershell.exe",
+  "pwsh",
+  "pwsh.exe",
+  "sh",
+  "sh.exe",
+  "zsh",
+]);
+
+function permissionFor(
+  permissions: readonly MCPToolPermission[],
+  toolName: string,
+): MCPToolPermission | null {
+  return permissions.find((permission) => permission.toolName === toolName) ?? null;
+}
+
+function safeEnvironment(server: MCPServerRegistration): Record<string, string> {
+  const environment: Record<string, string> = {};
+  const safeNames = [
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "NO_PROXY",
+    "PATH",
+    "PATHEXT",
+    "SSL_CERT_FILE",
+    "SystemRoot",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+  ];
+  for (const name of safeNames) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  for (const name of server.passEnvironment ?? []) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  for (const [name, value] of Object.entries(server.environment ?? {})) {
+    environment[name] = value;
+  }
+  return environment;
+}
+
+function validateRegistration(server: MCPServerRegistration): void {
+  if (server.transport !== "stdio") return;
+  const executable = server.endpoint.trim();
+  if (executable.length === 0 || executable.includes("\0") || /[\r\n]/.test(executable)) {
+    throw new Error(`MCP server '${server.name}' must declare one direct executable.`);
+  }
+  if (DENIED_EXECUTABLES.has(basename(executable).toLowerCase())) {
+    throw new Error(`MCP server '${server.name}' cannot use a shell executable.`);
+  }
+  for (const argument of server.args ?? []) {
+    if (argument.includes("\0") || /[\r\n]/.test(argument)) {
+      throw new Error(`MCP server '${server.name}' has an invalid argument.`);
+    }
+  }
+}
+
+function text(value: string | Buffer | null): string {
+  if (typeof value === "string") return value;
+  return value?.toString("utf8") ?? "";
+}
+
+function parseHelperResult(result: ReturnType<typeof spawnSync>): MCPInvocationResult {
+  const stdout = text(result.stdout);
+  try {
+    const parsed = JSON.parse(stdout.trim()) as {
+      success: boolean;
+      output?: string;
+      error?: string;
+    };
+    return parsed.success
+      ? { success: true, output: parsed.output ?? "null" }
+      : { success: false, output: "", error: parsed.error ?? "MCP invocation failed" };
+  } catch {
+    const stderr = text(result.stderr);
+    const detail = `${stderr}${result.error ? `\n${result.error.message}` : ""}`.trim();
+    return {
+      success: false,
+      output: "",
+      error: `MCP stdio client returned no valid result${detail ? `: ${detail.slice(0, 1000)}` : "."}`,
+    };
+  }
+}
 
 export function createMCPRegistry(): MCPRegistry {
   const servers = new Map<string, MCPServerRegistration>();
 
-  function isToolAllowed(permissions: MCPToolPermission[], toolName: string): boolean {
-    const perm = permissions.find((p) => p.toolName === toolName);
-    if (!perm) return false; // Implicit deny
-    return perm.allowed;
-  }
-
   return {
     register(server: MCPServerRegistration): void {
+      validateRegistration(server);
       servers.set(server.id, server);
     },
 
@@ -39,13 +137,14 @@ export function createMCPRegistry(): MCPRegistry {
       serverId: EntityId,
       toolName: string,
       args: Record<string, unknown>,
+      options: MCPInvocationOptions = {},
     ): MCPInvocationResult {
       const server = servers.get(serverId);
       if (!server) {
         return { success: false, output: "", error: `MCP server not found: ${serverId}` };
       }
 
-      const tool = server.tools.find((t) => t.name === toolName);
+      const tool = server.tools.find((candidate) => candidate.name === toolName);
       if (!tool) {
         return {
           success: false,
@@ -54,11 +153,26 @@ export function createMCPRegistry(): MCPRegistry {
         };
       }
 
-      if (!isToolAllowed(server.permissions, toolName)) {
+      const permission = permissionFor(server.permissions, toolName);
+      if (!permission?.allowed) {
         return {
           success: false,
           output: "",
           error: `Tool '${toolName}' not permitted on server ${server.name}`,
+        };
+      }
+      if (permission.requireApproval && options.approved !== true) {
+        return {
+          success: false,
+          output: "",
+          error: `Tool '${toolName}' requires explicit approval on server ${server.name}`,
+        };
+      }
+      if (permission.requireApproval && !options.approvalId?.trim()) {
+        return {
+          success: false,
+          output: "",
+          error: `Tool '${toolName}' approval must include a durable approval ID.`,
         };
       }
 
@@ -66,48 +180,36 @@ export function createMCPRegistry(): MCPRegistry {
         return {
           success: false,
           output: "",
-          error: `Transport '${server.transport}' is not supported yet for server ${server.name}`,
+          error: `Transport '${server.transport}' is not supported for server ${server.name}`,
         };
       }
 
-      try {
-        const request = JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: toolName,
-          params: args,
-        });
-        const stdout = execSync(server.endpoint, {
-          input: request,
-          encoding: "utf-8",
-          timeout: 10000,
-        });
-        const response = JSON.parse(stdout) as {
-          result?: unknown;
-          error?: { message?: string } | string;
-        };
-        if (response.error !== undefined) {
-          return {
-            success: false,
-            output: "",
-            error:
-              typeof response.error === "string"
-                ? response.error
-                : (response.error.message ?? "MCP tool error"),
-          };
-        }
-        return {
-          success: true,
-          output: JSON.stringify(response.result ?? null),
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          success: false,
-          output: "",
-          error: `MCP stdio invocation failed: ${message}`,
-        };
+      const timeoutMs = Math.min(Math.max(server.timeoutMs ?? DEFAULT_TIMEOUT_MS, 100), 120_000);
+      const request = JSON.stringify({
+        executable: server.endpoint,
+        args: [...(server.args ?? [])],
+        cwd: resolve(server.cwd ?? process.cwd()),
+        environment: safeEnvironment(server),
+        timeoutMs,
+        maxOutputBytes: MAX_OUTPUT_BYTES,
+        protocolVersion: server.protocolVersion ?? DEFAULT_PROTOCOL_VERSION,
+        toolName,
+        arguments: args,
+      });
+      if (Buffer.byteLength(request, "utf8") > MAX_INPUT_BYTES) {
+        return { success: false, output: "", error: "MCP request exceeds the input limit" };
       }
+
+      const result = spawnSync(process.execPath, [STDIO_HELPER], {
+        input: request,
+        encoding: "utf-8",
+        shell: false,
+        windowsHide: true,
+        timeout: timeoutMs + 2_500,
+        maxBuffer: MAX_OUTPUT_BYTES,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      return parseHelperResult(result);
     },
   };
 }
