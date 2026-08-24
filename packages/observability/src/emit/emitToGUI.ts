@@ -1,8 +1,6 @@
-// PANTAW-EMIT v2 — Ported to The Machine observability package
-// Hardened failsafe: GUI is OPTIONAL. Never throws, never blocks.
-// Compatible with the original PANTAW 24-samurai mapping.
+// PANTAW-EMIT v2 — Ported to The Machine observability package.
+// GUI delivery is optional and fail-safe, but event publication requires a scoped capability.
 
-/** The 24 samurai names — identical to PANTAW-EMIT mapping. */
 const AGENT_NAMES: Readonly<Record<number, string>> = {
   1: "Oda Nobunaga",
   2: "Tokugawa Ieyasu",
@@ -30,16 +28,31 @@ const AGENT_NAMES: Readonly<Record<number, string>> = {
   24: "Hattori Hanzo",
 };
 
-/** Default station assignment per agent — mirrors PANTAW's DEFAULT_STATION_BY_AGENT. */
 const DEFAULT_STATION: Readonly<Record<number, string>> = {
-  1: "planning", 2: "planning", 3: "planning", 4: "planning",
-  5: "coding", 6: "code-review", 7: "coding",
-  8: "planning", 9: "planning", 10: "kaizen",
-  11: "qa-testing", 12: "deploy", 13: "coding",
-  14: "security-scan", 15: "coding", 16: "qa-testing",
-  17: "planning", 18: "planning",
-  19: "gate-clear", 20: "gate-clear", 21: "takt",
-  22: "kaizen", 23: "kaizen", 24: "dependency-check",
+  1: "planning",
+  2: "planning",
+  3: "planning",
+  4: "planning",
+  5: "coding",
+  6: "code-review",
+  7: "coding",
+  8: "planning",
+  9: "planning",
+  10: "kaizen",
+  11: "qa-testing",
+  12: "deploy",
+  13: "coding",
+  14: "security-scan",
+  15: "coding",
+  16: "qa-testing",
+  17: "planning",
+  18: "planning",
+  19: "gate-clear",
+  20: "gate-clear",
+  21: "takt",
+  22: "kaizen",
+  23: "kaizen",
+  24: "dependency-check",
 };
 
 export type GuiEventType = "start" | "progress" | "complete" | "victory" | "andon" | "blocker";
@@ -57,14 +70,26 @@ export type GuiStation =
   | "dependency-check";
 
 const VALID_EVENT_TYPES = new Set<string>([
-  "start", "progress", "complete", "victory", "andon", "blocker",
+  "start",
+  "progress",
+  "complete",
+  "victory",
+  "andon",
+  "blocker",
 ]);
 const VALID_STATIONS = new Set<string>([
-  "planning", "coding", "code-review", "qa-testing", "security-scan",
-  "deploy", "gate-clear", "kaizen", "takt", "dependency-check",
+  "planning",
+  "coding",
+  "code-review",
+  "qa-testing",
+  "security-scan",
+  "deploy",
+  "gate-clear",
+  "kaizen",
+  "takt",
+  "dependency-check",
 ]);
 
-/** Payload sent to the GUI webhook. */
 export interface GuiEvent {
   eventId: string;
   timestamp: string;
@@ -73,13 +98,10 @@ export interface GuiEvent {
   station: GuiStation;
   eventType: GuiEventType;
   message: string;
-  /** Theme version identifier — lets the GUI render different art styles.
-   *  e.g. "fft-chibi", "snes-pixel", "nes-8bit", "samurai-dojo" */
   theme: string;
   metrics: Record<string, unknown>;
 }
 
-/** Raw input — all fields optional except agentId. Unset fields get safe defaults. */
 export interface GuiEventInput {
   agentId: number;
   eventType?: string;
@@ -90,18 +112,12 @@ export interface GuiEventInput {
 }
 
 export interface EmitConfig {
-  /** Webhook URL for the GUI. Defaults to ENV['PANTAW_FRONTEND_WEBHOOK_URL']
-   *  or 'http://localhost:3000/api/pipeline-event'. */
   webhookUrl?: string;
-  /** HTTP timeout in ms. Default 2000 (PANTAW-compatible). */
   timeout?: number;
-  /** Default theme. Default "fft-chibi". */
   defaultTheme?: string;
+  /** Event-producer capability returned by getGuiServerAccess(). */
+  eventToken?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 function generateEventId(): string {
   return `evt-${String(Date.now())}-${Math.random().toString(36).substring(2, 11)}`;
@@ -112,9 +128,8 @@ function cleanInput(
   defaultTheme: string,
 ): { event: GuiEvent; errors: string[] } {
   const errors: string[] = [];
-
   let agentId = Math.trunc(input.agentId);
-  if (isNaN(agentId) || agentId < 1 || agentId > 24) {
+  if (Number.isNaN(agentId) || agentId < 1 || agentId > 24) {
     errors.push(`Invalid agentId: ${String(input.agentId)} (must be 1-24)`);
     agentId = 0;
   }
@@ -126,48 +141,34 @@ function cleanInput(
   }
 
   let station = (input.station ?? "").toLowerCase();
-  if (!station && agentId > 0) {
-    station = DEFAULT_STATION[agentId] ?? "planning";
-  }
+  if (!station && agentId > 0) station = DEFAULT_STATION[agentId] ?? "planning";
   if (!VALID_STATIONS.has(station)) {
     errors.push(`Invalid station: ${station}`);
     station = "planning";
   }
-
-  const agentName = AGENT_NAMES[agentId] ?? "Unknown Agent";
-  const message = (input.message ?? "").substring(0, 240);
-  const theme = input.theme ?? defaultTheme;
-  const metrics =
-    input.metrics &&
-    typeof input.metrics === "object" &&
-    !Array.isArray(input.metrics)
-      ? input.metrics
-      : {};
 
   return {
     event: {
       eventId: generateEventId(),
       timestamp: new Date().toISOString(),
       agentId,
-      agentName,
+      agentName: AGENT_NAMES[agentId] ?? "Unknown Agent",
       station: station as GuiStation,
       eventType: eventType as GuiEventType,
-      message,
-      theme,
-      metrics,
+      message: (input.message ?? "").substring(0, 240),
+      theme: input.theme ?? defaultTheme,
+      metrics:
+        input.metrics && typeof input.metrics === "object" && !Array.isArray(input.metrics)
+          ? input.metrics
+          : {},
     },
     errors,
   };
 }
 
-function logFallback(
-  event: GuiEvent,
-  errors: string[],
-  webhookUrl: string,
-  reason: string,
-): void {
+function logFallback(event: GuiEvent, errors: string[], webhookUrl: string, reason: string): void {
   console.log(
-    `[PANTAW-EMIT FALLBACK] Frontend webhook unreachable at ${webhookUrl} — reason: ${reason}`,
+    `[PANTAW-EMIT FALLBACK] Frontend webhook unavailable at ${webhookUrl} — reason: ${reason}`,
   );
   console.log(`[PANTAW-EMIT EVENT] ${JSON.stringify(event)}`);
   if (errors.length > 0) {
@@ -179,28 +180,30 @@ async function postEvent(
   event: GuiEvent,
   webhookUrl: string,
   timeoutMs: number,
+  eventToken: string | undefined,
 ): Promise<{ ok: boolean; reason: string }> {
+  if (!eventToken) return { ok: false, reason: "missing event-producer capability" };
   const controller = new AbortController();
-  const timer = setTimeout(() => { controller.abort(); }, timeoutMs);
-
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${eventToken}`,
+      },
       body: JSON.stringify(event),
       signal: controller.signal,
     });
-
-    if (!response.ok) {
-      return { ok: false, reason: `HTTP ${String(response.status)}` };
-    }
-    return { ok: true, reason: "" };
-  } catch (err: unknown) {
+    return response.ok
+      ? { ok: true, reason: "" }
+      : { ok: false, reason: `HTTP ${String(response.status)}` };
+  } catch (error: unknown) {
     const reason =
-      err instanceof Error
-        ? err.name === "AbortError"
+      error instanceof Error
+        ? error.name === "AbortError"
           ? "timeout"
-          : err.message.substring(0, 200)
+          : error.message.substring(0, 200)
         : "unknown error";
     return { ok: false, reason };
   } finally {
@@ -208,62 +211,38 @@ async function postEvent(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+function resolvedConfig(config?: EmitConfig): {
+  webhookUrl: string;
+  timeout: number;
+  defaultTheme: string;
+  eventToken: string | undefined;
+} {
+  return {
+    webhookUrl:
+      config?.webhookUrl ??
+      (typeof process !== "undefined" ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"] : undefined) ??
+      "http://localhost:3000/api/pipeline-event",
+    timeout: config?.timeout ?? 2_000,
+    defaultTheme: config?.defaultTheme ?? "fft-chibi",
+    eventToken:
+      config?.eventToken ??
+      (typeof process !== "undefined" ? process.env["MACHINE_GUI_EVENT_TOKEN"] : undefined),
+  };
+}
 
-/**
- * Fire-and-forget emit to the War Council GUI.
- *
- * NEVER throws, NEVER blocks the caller. If the GUI is unreachable (crashed,
- * closed, returning 500s), the event is console.log'd as a fallback.
- *
- * @example
- *   import { emitToGUI } from '@the-machine/observability/emit';
- *
- *   emitToGUI({
- *     agentId: 7,          // Ii Naomasa
- *     eventType: 'start',
- *     station: 'coding',
- *     message: 'Beginning EP-002 M4 implementation',
- *     theme: 'fft-chibi',
- *     metrics: { execPlan: 'EP-002', milestone: 'M4' },
- *   });
- */
-export function emitToGUI(
-  input: GuiEventInput,
-  config?: EmitConfig,
-): GuiEvent {
-  const webhookUrl =
-    config?.webhookUrl ??
-    (typeof process !== "undefined"
-      ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"]
-      : undefined) ??
-    "http://localhost:3000/api/pipeline-event";
-
-  const timeout = config?.timeout ?? 2000;
-  const defaultTheme = config?.defaultTheme ?? "fft-chibi";
-
-  const { event, errors } = cleanInput(input, defaultTheme);
-
-  // Fire and forget — log fallback on failure
-  postEvent(event, webhookUrl, timeout)
+export function emitToGUI(input: GuiEventInput, config?: EmitConfig): GuiEvent {
+  const resolved = resolvedConfig(config);
+  const { event, errors } = cleanInput(input, resolved.defaultTheme);
+  postEvent(event, resolved.webhookUrl, resolved.timeout, resolved.eventToken)
     .then((result) => {
-      if (!result.ok) {
-        logFallback(event, errors, webhookUrl, result.reason);
-      }
+      if (!result.ok) logFallback(event, errors, resolved.webhookUrl, result.reason);
     })
-    .catch((err: unknown) => {
-      logFallback(event, errors, webhookUrl, String(err));
+    .catch((error: unknown) => {
+      logFallback(event, errors, resolved.webhookUrl, String(error));
     });
-
   return event;
 }
 
-/**
- * Synchronous variant — returns a Promise that resolves with the result.
- * Use this when the caller wants to know if the GUI received the event.
- */
 export async function emitToGUIAsync(
   input: GuiEventInput,
   config?: EmitConfig,
@@ -273,38 +252,17 @@ export async function emitToGUIAsync(
   reason?: string;
   validationErrors: string[];
 }> {
-  const webhookUrl =
-    config?.webhookUrl ??
-    (typeof process !== "undefined"
-      ? process.env["PANTAW_FRONTEND_WEBHOOK_URL"]
-      : undefined) ??
-    "http://localhost:3000/api/pipeline-event";
-
-  const timeout = config?.timeout ?? 2000;
-  const defaultTheme = config?.defaultTheme ?? "fft-chibi";
-
-  const { event, errors } = cleanInput(input, defaultTheme);
-
+  const resolved = resolvedConfig(config);
+  const { event, errors } = cleanInput(input, resolved.defaultTheme);
   try {
-    const result = await postEvent(event, webhookUrl, timeout);
-    if (!result.ok) {
-      logFallback(event, errors, webhookUrl, result.reason);
-    }
-    const out: { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[] } = {
-      success: result.ok,
-      event,
-      validationErrors: errors,
-    };
-    if (!result.ok) out.reason = result.reason;
-    return out as { success: boolean; event: GuiEvent; reason?: string; validationErrors: string[]; };
-  } catch (err: unknown) {
-    const reason = (err instanceof Error ? err.message : String(err)).substring(0, 200);
-    logFallback(event, errors, webhookUrl, reason);
-    return {
-      success: false,
-      event,
-      reason,
-      validationErrors: errors,
-    };
+    const result = await postEvent(event, resolved.webhookUrl, resolved.timeout, resolved.eventToken);
+    if (!result.ok) logFallback(event, errors, resolved.webhookUrl, result.reason);
+    return result.ok
+      ? { success: true, event, validationErrors: errors }
+      : { success: false, event, reason: result.reason, validationErrors: errors };
+  } catch (error: unknown) {
+    const reason = (error instanceof Error ? error.message : String(error)).substring(0, 200);
+    logFallback(event, errors, resolved.webhookUrl, reason);
+    return { success: false, event, reason, validationErrors: errors };
   }
 }

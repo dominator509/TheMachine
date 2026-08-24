@@ -225,9 +225,7 @@ describe("checkDeadlocks", () => {
       currentAgentId: null,
       acquiredCount: 0,
       config: { maxConcurrency: 1, defaultTimeoutMs: 1 }, // 1ms timeout
-      queue: [
-        { agentId: "stale-agent", enqueuedAt: Date.now() - 100_000, timeoutMs: 50 },
-      ],
+      queue: [{ agentId: "stale-agent", enqueuedAt: Date.now() - 100_000, timeoutMs: 50 }],
     };
 
     const result = checkDeadlocks(machine);

@@ -13,6 +13,12 @@ export interface PluginHandler {
     permissionCount: number,
     releaseDecision?: ReleaseDecision,
   ): PluginResponse;
+  recordActivation(
+    pluginId: EntityId,
+    enabled: boolean,
+    evidence: string,
+    checkedAt?: string,
+  ): PluginResponse | null;
   acceptRelease(pluginId: EntityId, decision: ReleaseDecision): PluginResponse | null;
 }
 
@@ -44,11 +50,27 @@ export function createPluginHandler(): PluginHandler {
         version,
         entryPoint,
         permissionCount,
-        enabled: true,
+        enabled: false,
         ...(releaseDecision ? { releaseDecision } : {}),
       };
       plugins.set(id, plugin);
       return plugin;
+    },
+
+    recordActivation(pluginId, enabled, evidence, checkedAt): PluginResponse | null {
+      const plugin = plugins.get(pluginId);
+      if (!plugin) return null;
+      if (evidence.trim().length === 0) {
+        throw new Error("Plugin activation evidence must not be empty.");
+      }
+      const updated: PluginResponse = {
+        ...plugin,
+        enabled,
+        activationCheckedAt: checkedAt ?? new Date().toISOString(),
+        activationEvidence: evidence,
+      };
+      plugins.set(pluginId, updated);
+      return updated;
     },
 
     acceptRelease(pluginId: EntityId, decision: ReleaseDecision): PluginResponse | null {

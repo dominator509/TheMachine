@@ -48,6 +48,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@the-machine/agent-runtime':
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime
       '@the-machine/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -125,6 +128,9 @@ importers:
 
   packages/service:
     dependencies:
+      '@the-machine/agent-runtime':
+        specifier: workspace:*
+        version: link:../agent-runtime
       '@the-machine/core':
         specifier: workspace:*
         version: link:../core

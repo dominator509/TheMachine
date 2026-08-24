@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 /** Patch dashboard.html for Moria theme — backgrounds + sprites */
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from "fs";
 
-const path = '/root/Machine/packages/service/src/gui/dashboard.html';
-let html = readFileSync(path, 'utf8');
+const path = "/root/Machine/packages/service/src/gui/dashboard.html";
+let html = readFileSync(path, "utf8");
 
 // 1. Station panel CSS — add background-size and has-background
 html = html.replace(
-  '.station-panel {\n  background: var(--panel);\n  border: 1px solid rgba(255,255,255,0.08);\n  border-radius: var(--radius);\n  overflow: hidden;\n  transition: transform 0.2s, box-shadow 0.2s;\n}\n.station-panel:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 6px 20px rgba(0,0,0,0.4);\n}',
-  '.station-panel {\n  background: var(--panel);\n  border: 1px solid rgba(255,255,255,0.08);\n  border-radius: var(--radius);\n  overflow: hidden;\n  transition: transform 0.2s, box-shadow 0.2s;\n  background-size: cover;\n  background-position: center;\n  min-height: 140px;\n}\n.station-panel.has-background .station-header {\n  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);\n}\n.station-panel:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 6px 20px rgba(0,0,0,0.4);\n}'
+  ".station-panel {\n  background: var(--panel);\n  border: 1px solid rgba(255,255,255,0.08);\n  border-radius: var(--radius);\n  overflow: hidden;\n  transition: transform 0.2s, box-shadow 0.2s;\n}\n.station-panel:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 6px 20px rgba(0,0,0,0.4);\n}",
+  ".station-panel {\n  background: var(--panel);\n  border: 1px solid rgba(255,255,255,0.08);\n  border-radius: var(--radius);\n  overflow: hidden;\n  transition: transform 0.2s, box-shadow 0.2s;\n  background-size: cover;\n  background-position: center;\n  min-height: 140px;\n}\n.station-panel.has-background .station-header {\n  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);\n}\n.station-panel:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 6px 20px rgba(0,0,0,0.4);\n}",
 );
 
 // 2. Agent badge avatar → sprite
 html = html.replace(
-  '.agent-badge .avatar {\n  width: 24px; height: 24px;\n  border-radius: 50%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.7rem;\n  font-weight: 800;\n  color: #fff;\n  flex-shrink: 0;\n}',
-  '.agent-badge .sprite {\n  width: 32px; height: 32px;\n  flex-shrink: 0;\n  image-rendering: pixelated;\n  background-size: 64px 32px;\n  background-repeat: no-repeat;\n}\n.agent-badge .sprite.idle {\n  animation: spriteIdle 1.2s steps(2) infinite;\n}\n.agent-badge .sprite.working {\n  animation: spriteWork 1s steps(2) infinite;\n}\n@keyframes spriteIdle {\n  0% { background-position: 0 0; }\n  100% { background-position: -64px 0; }\n}\n@keyframes spriteWork {\n  0% { background-position: 0 0; }\n  100% { background-position: -64px 0; }\n}'
+  ".agent-badge .avatar {\n  width: 24px; height: 24px;\n  border-radius: 50%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.7rem;\n  font-weight: 800;\n  color: #fff;\n  flex-shrink: 0;\n}",
+  ".agent-badge .sprite {\n  width: 32px; height: 32px;\n  flex-shrink: 0;\n  image-rendering: pixelated;\n  background-size: 64px 32px;\n  background-repeat: no-repeat;\n}\n.agent-badge .sprite.idle {\n  animation: spriteIdle 1.2s steps(2) infinite;\n}\n.agent-badge .sprite.working {\n  animation: spriteWork 1s steps(2) infinite;\n}\n@keyframes spriteIdle {\n  0% { background-position: 0 0; }\n  100% { background-position: -64px 0; }\n}\n@keyframes spriteWork {\n  0% { background-position: 0 0; }\n  100% { background-position: -64px 0; }\n}",
 );
 
 // 3. status-busy .avatar → .sprite
 html = html.replace(
-  '.agent-badge.status-busy .avatar {\n  animation: pulse 1.2s ease infinite;\n}',
-  '.agent-badge.status-busy .sprite {\n  animation: spriteWork 1s steps(2) infinite;\n}'
+  ".agent-badge.status-busy .avatar {\n  animation: pulse 1.2s ease infinite;\n}",
+  ".agent-badge.status-busy .sprite {\n  animation: spriteWork 1s steps(2) infinite;\n}",
 );
 
 // 4. findOrCreateStationPanel — add background + use label
@@ -50,7 +50,7 @@ html = html.replace(
       <span class="station-badge" id="count-\${stationId}">0</span>
     </div>
     <div class="station-slots" id="slots-\${stationId}"></div>
-  \`;`
+  \`;`,
 );
 
 // 5. findOrCreateAgentBadge — use sprites
@@ -101,7 +101,7 @@ html = html.replace(
   if (station && stations[station]) {
     stations[station].agents.add(agentId);
     stations[station].countEl.textContent = stations[station].agents.size;
-  }`
+  }`,
 );
 
 // 6. handlePipelineEvent — animate sprites on alert
@@ -135,8 +135,8 @@ html = html.replace(
     }
   } else {
     badge.classList.add('just-arrived');
-  }`
+  }`,
 );
 
 writeFileSync(path, html);
-console.log('✅ dashboard.html patched with Moria theme support');
+console.log("✅ dashboard.html patched with Moria theme support");

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /** Generate 10 Moria station backdrops with Sharp — 800×500 */
-import sharp from 'sharp';
-import { mkdirSync } from 'fs';
+import sharp from "sharp";
+import { mkdirSync } from "fs";
 
-const OUT = '/root/Machine/packages/service/src/gui/themes/moria-dwarves/backgrounds';
-const W = 800, H = 500;
+const OUT = "/root/Machine/packages/service/src/gui/themes/moria-dwarves/backgrounds";
+const W = 800,
+  H = 500;
 
 mkdirSync(OUT, { recursive: true });
 
@@ -39,7 +40,7 @@ async function addTorchGlow(base, x, y, radius, intensity) {
     <circle cx="${x}" cy="${y}" r="${radius}" fill="url(#t${x}${y})"/>
   </svg>`;
   const glowBuf = await sharp(Buffer.from(svg)).resize(W, H).png().toBuffer();
-  return sharp(await base.toBuffer()).composite([{ input: glowBuf, blend: 'screen' }]);
+  return sharp(await base.toBuffer()).composite([{ input: glowBuf, blend: "screen" }]);
 }
 
 function makeGlow(radius, intensity) {
@@ -49,12 +50,13 @@ function makeGlow(radius, intensity) {
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
       const i = (y * s + x) * 4;
-      const dx = x - r, dy = y - r;
+      const dx = x - r,
+        dy = y - r;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const alpha = dist <= r ? (1 - dist / r) * intensity * 255 : 0;
-      pixels[i] = 255;     // R
+      pixels[i] = 255; // R
       pixels[i + 1] = 140 + Math.floor(alpha * 0.3); // G
-      pixels[i + 2] = 20;  // B
+      pixels[i + 2] = 20; // B
       pixels[i + 3] = Math.floor(alpha);
     }
   }
@@ -64,7 +66,8 @@ function makeGlow(radius, intensity) {
 async function renderStoneWall(baseColor = [60, 50, 40], brickW = 80, brickH = 30) {
   // Generate a brick wall texture with grout lines
   const svgParts = [];
-  let y = 0, row = 0;
+  let y = 0,
+    row = 0;
   while (y < H) {
     const offset = row % 2 === 0 ? 0 : brickW / 2;
     let x = -brickW + Math.floor(offset);
@@ -73,14 +76,18 @@ async function renderStoneWall(baseColor = [60, 50, 40], brickW = 80, brickH = 3
       const bw = brickW - (bx - x) - Math.max(0, x + brickW - W);
       const by = y;
       const bh = Math.min(brickH, H - y);
-      const shade = baseColor.map(c => Math.min(255, Math.max(0, c + (Math.random() - 0.5) * 25)));
-      svgParts.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="rgb(${shade[0]},${shade[1]},${shade[2]})" rx="2"/>`);
+      const shade = baseColor.map((c) =>
+        Math.min(255, Math.max(0, c + (Math.random() - 0.5) * 25)),
+      );
+      svgParts.push(
+        `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="rgb(${shade[0]},${shade[1]},${shade[2]})" rx="2"/>`,
+      );
       x += brickW + 2;
     }
     y += brickH + 2;
     row++;
   }
-  const svg = `<svg width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#1a1410"/>${svgParts.join('')}</svg>`;
+  const svg = `<svg width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#1a1410"/>${svgParts.join("")}</svg>`;
   return sharp(Buffer.from(svg)).png();
 }
 
@@ -562,15 +569,25 @@ async function renderTreasury() {
 }
 
 // Generate all
-console.log('Generating Moria station backdrops...');
-await renderCouncilChamber();    console.log('✓ council-chamber.png');
-await renderGreatForge();        console.log('✓ great-forge.png');
-await renderRuneArchives();      console.log('✓ rune-archives.png');
-await renderTestingCavern();     console.log('✓ testing-cavern.png');
-await renderDurinsDoor();        console.log('✓ durins-door.png');
-await renderBridge();             console.log('✓ bridge.png');
-await renderGreatGates();        console.log('✓ great-gates.png');
-await renderMithrilVein();       console.log('✓ mithril-vein.png');
-await renderDrumChamber();       console.log('✓ drum-chamber.png');
-await renderTreasury();           console.log('✓ treasury.png');
-console.log('\n✅ All 10 backgrounds generated in', OUT);
+console.log("Generating Moria station backdrops...");
+await renderCouncilChamber();
+console.log("✓ council-chamber.png");
+await renderGreatForge();
+console.log("✓ great-forge.png");
+await renderRuneArchives();
+console.log("✓ rune-archives.png");
+await renderTestingCavern();
+console.log("✓ testing-cavern.png");
+await renderDurinsDoor();
+console.log("✓ durins-door.png");
+await renderBridge();
+console.log("✓ bridge.png");
+await renderGreatGates();
+console.log("✓ great-gates.png");
+await renderMithrilVein();
+console.log("✓ mithril-vein.png");
+await renderDrumChamber();
+console.log("✓ drum-chamber.png");
+await renderTreasury();
+console.log("✓ treasury.png");
+console.log("\n✅ All 10 backgrounds generated in", OUT);

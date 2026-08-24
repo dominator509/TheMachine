@@ -38,117 +38,175 @@ interface ProductionApprovalSource {
   get(): ProductionApprovalResponse;
 }
 
+export interface ExecutedReadinessEvidence {
+  readonly subsystem: string;
+  readonly candidateSha: string;
+  readonly passed: boolean;
+  readonly checkCount: number;
+  readonly evidenceDigest: string;
+  readonly completedAt: string;
+}
+
+export interface ReadinessEvidenceSource {
+  readonly expectedCandidateSha?: string;
+  get(subsystem: string): ExecutedReadinessEvidence | null;
+}
+
 export interface ReadinessDependencies {
   readonly providers?: ProviderReadinessSource;
   readonly mcp?: MCPReadinessSource;
   readonly plugins?: PluginReadinessSource;
   readonly ui?: UIReadinessSource;
   readonly approval?: ProductionApprovalSource;
+  readonly evidence?: ReadinessEvidenceSource;
 }
 
 function gate(
   subsystem: string,
   checks: readonly boolean[],
-  rejected = false,
+  failed = false,
 ): ReadinessGateSummary {
   const passedChecks = checks.filter(Boolean).length;
   const totalChecks = checks.length;
-  const status = passedChecks === totalChecks ? "completed" : rejected ? "failed" : "pending";
+  const status = passedChecks === totalChecks ? "completed" : failed ? "failed" : "pending";
   return { subsystem, status, passedChecks, totalChecks };
 }
 
-function serviceGate(approval?: ProductionApprovalSource): ReadinessGateSummary {
-  const accepted = approval?.get().accepted ?? false;
-  return gate("service", [true, true, accepted]);
+function executionState(source: ReadinessEvidenceSource | undefined, subsystem: string): {
+  checks: boolean[];
+  failed: boolean;
+} {
+  const record = source?.get(subsystem) ?? null;
+  const expectedSha = source?.expectedCandidateSha;
+  const candidateMatches =
+    record !== null && (expectedSha === undefined || record.candidateSha === expectedSha);
+  const checks = [
+    record !== null,
+    candidateMatches,
+    (record?.checkCount ?? 0) > 0,
+    (record?.evidenceDigest.trim().length ?? 0) > 0,
+    record?.passed === true,
+  ];
+  const failed =
+    record !== null &&
+    (!candidateMatches || record.checkCount < 1 || record.evidenceDigest.trim().length === 0 || !record.passed);
+  return { checks, failed };
 }
 
-function providerGate(
-  source?: ProviderReadinessSource,
-  approval?: ProductionApprovalSource,
+function executedGate(
+  subsystem: string,
+  evidence?: ReadinessEvidenceSource,
 ): ReadinessGateSummary {
-  const providers = source?.list().providers ?? [];
+  const execution = executionState(evidence, subsystem);
+  return gate(subsystem, execution.checks, execution.failed);
+}
+
+function serviceGate(deps: ReadinessDependencies): ReadinessGateSummary {
+  const execution = executionState(deps.evidence, "service");
+  const accepted = deps.approval?.get().accepted ?? false;
+  return gate("service", [...execution.checks, accepted], execution.failed);
+}
+
+function providerGate(deps: ReadinessDependencies): ReadinessGateSummary {
+  const execution = executionState(deps.evidence, "providers");
+  const providers = deps.providers?.list().providers ?? [];
   const accepted = providers.some((provider) => provider.releaseDecision?.status === "accepted");
   const rejected = providers.some((provider) => provider.releaseDecision?.status === "rejected");
   const approvalAccepted =
-    approval?.get().approval?.providerConfiguration.status === "accepted";
-  const configuredProvidersAccepted =
-    providers.length === 0 || (providers.some((provider) => provider.healthy) && accepted);
-  return gate("providers", [
-    !rejected,
-    configuredProvidersAccepted,
-    approvalAccepted,
-  ], rejected);
+    deps.approval?.get().approval?.providerConfiguration.status === "accepted";
+  const liveProbe = providers.some(
+    (provider) =>
+      provider.healthy &&
+      provider.healthCheckedAt !== undefined &&
+      (provider.healthEvidence?.trim().length ?? 0) > 0,
+  );
+  return gate(
+    "providers",
+    [...execution.checks, providers.length > 0, liveProbe, accepted, approvalAccepted],
+    execution.failed || rejected,
+  );
 }
 
-function mcpGate(
-  source?: MCPReadinessSource,
-  approval?: ProductionApprovalSource,
-): ReadinessGateSummary {
-  const servers = source?.list().servers ?? [];
+function mcpGate(deps: ReadinessDependencies): ReadinessGateSummary {
+  const execution = executionState(deps.evidence, "mcp");
+  const servers = deps.mcp?.list().servers ?? [];
   const accepted = servers.some((server) => server.releaseDecision?.status === "accepted");
   const rejected = servers.some((server) => server.releaseDecision?.status === "rejected");
-  const approvalAccepted = approval?.get().approval?.mcpConfiguration.status === "accepted";
-  const configuredServersAccepted =
-    servers.length === 0 || (servers.some((server) => server.healthy && server.toolCount > 0) && accepted);
-  return gate("mcp", [
-    !rejected,
-    configuredServersAccepted,
-    approvalAccepted,
-  ], rejected);
+  const approvalAccepted = deps.approval?.get().approval?.mcpConfiguration.status === "accepted";
+  const liveProbe = servers.some(
+    (server) =>
+      server.healthy &&
+      server.toolCount > 0 &&
+      server.healthCheckedAt !== undefined &&
+      (server.healthEvidence?.trim().length ?? 0) > 0,
+  );
+  return gate(
+    "mcp",
+    [...execution.checks, servers.length > 0, liveProbe, accepted, approvalAccepted],
+    execution.failed || rejected,
+  );
 }
 
-function pluginGate(
-  source?: PluginReadinessSource,
-  approval?: ProductionApprovalSource,
-): ReadinessGateSummary {
-  const plugins = source?.list().plugins ?? [];
+function pluginGate(deps: ReadinessDependencies): ReadinessGateSummary {
+  const execution = executionState(deps.evidence, "plugin-sdk");
+  const plugins = deps.plugins?.list().plugins ?? [];
   const accepted = plugins.some((plugin) => plugin.releaseDecision?.status === "accepted");
   const rejected = plugins.some((plugin) => plugin.releaseDecision?.status === "rejected");
-  const approvalAccepted = approval?.get().approval?.pluginSandbox.status === "accepted";
-  const configuredPluginsAccepted =
-    plugins.length === 0 || (plugins.some((plugin) => plugin.enabled) && accepted);
-  return gate("plugin-sdk", [
-    !rejected,
-    configuredPluginsAccepted,
-    approvalAccepted,
-  ], rejected);
+  const approvalAccepted = deps.approval?.get().approval?.pluginSandbox.status === "accepted";
+  const verifiedActivation = plugins.some(
+    (plugin) =>
+      plugin.enabled &&
+      plugin.activationCheckedAt !== undefined &&
+      (plugin.activationEvidence?.trim().length ?? 0) > 0,
+  );
+  return gate(
+    "plugin-sdk",
+    [...execution.checks, plugins.length > 0, verifiedActivation, accepted, approvalAccepted],
+    execution.failed || rejected,
+  );
 }
 
-function uiGate(
-  source?: UIReadinessSource,
-  approval?: ProductionApprovalSource,
-): ReadinessGateSummary {
-  const approvalAccepted = approval?.get().approval?.sharedUIScope.status === "accepted";
-  return gate("ui-components", [
-    (source?.components.length ?? 0) > 0,
-    approvalAccepted,
-  ], source?.releaseDecision.status === "rejected");
+function uiGate(deps: ReadinessDependencies): ReadinessGateSummary {
+  const execution = executionState(deps.evidence, "ui-components");
+  const approvalAccepted = deps.approval?.get().approval?.sharedUIScope.status === "accepted";
+  return gate(
+    "ui-components",
+    [
+      ...execution.checks,
+      (deps.ui?.components.length ?? 0) > 0,
+      deps.ui?.isReleaseReady() === true,
+      approvalAccepted,
+    ],
+    execution.failed || deps.ui?.releaseDecision.status === "rejected",
+  );
 }
 
 export function createReadinessHandler(deps: ReadinessDependencies = {}): ReadinessHandler {
   return {
     check(req: ReadinessRequest): ReadinessResponse {
       const gates: ReadinessGateSummary[] = [
-        { subsystem: "core", status: "completed", passedChecks: 3, totalChecks: 3 },
-        { subsystem: "storage", status: "completed", passedChecks: 2, totalChecks: 2 },
-        serviceGate(deps.approval),
-        providerGate(deps.providers, deps.approval),
-        mcpGate(deps.mcp, deps.approval),
-        { subsystem: "security", status: "completed", passedChecks: 3, totalChecks: 3 },
-        { subsystem: "observability", status: "completed", passedChecks: 3, totalChecks: 3 },
-        { subsystem: "agent-runtime", status: "completed", passedChecks: 2, totalChecks: 2 },
-        pluginGate(deps.plugins, deps.approval),
-        { subsystem: "cli", status: "completed", passedChecks: 2, totalChecks: 2 },
-        { subsystem: "desktop", status: "completed", passedChecks: 1, totalChecks: 1 },
-        uiGate(deps.ui, deps.approval),
+        executedGate("core", deps.evidence),
+        executedGate("storage", deps.evidence),
+        serviceGate(deps),
+        providerGate(deps),
+        mcpGate(deps),
+        executedGate("security", deps.evidence),
+        executedGate("observability", deps.evidence),
+        executedGate("agent-runtime", deps.evidence),
+        pluginGate(deps),
+        executedGate("cli", deps.evidence),
+        executedGate("desktop", deps.evidence),
+        uiGate(deps),
       ];
 
-      const filtered = req.subsystem ? gates.filter((g) => g.subsystem === req.subsystem) : gates;
-      const allPassed = filtered.every((g) => g.passedChecks === g.totalChecks);
+      const filtered = req.subsystem ? gates.filter((candidate) => candidate.subsystem === req.subsystem) : gates;
+      const anyFailed = filtered.some((candidate) => candidate.status === "failed");
+      const allCompleted =
+        filtered.length > 0 && filtered.every((candidate) => candidate.status === "completed");
 
       return {
         workspaceId: req.workspaceId,
-        overall: allPassed ? "ready" : "degraded",
+        overall: anyFailed ? "not_ready" : allCompleted ? "ready" : "degraded",
         gates: filtered,
       };
     },

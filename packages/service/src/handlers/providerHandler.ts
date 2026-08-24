@@ -18,6 +18,12 @@ export interface ProviderHandler {
     timeoutMs: number,
     releaseDecision?: ReleaseDecision,
   ): ProviderResponse;
+  recordHealth(
+    providerId: EntityId,
+    healthy: boolean,
+    evidence: string,
+    checkedAt?: string,
+  ): ProviderResponse | null;
   acceptRelease(providerId: EntityId, decision: ReleaseDecision): ProviderResponse | null;
 }
 
@@ -51,11 +57,27 @@ export function createProviderHandler(): ProviderHandler {
         endpoint,
         models,
         timeoutMs,
-        healthy: true,
+        healthy: false,
         ...(releaseDecision ? { releaseDecision } : {}),
       };
       providers.set(id, provider);
       return provider;
+    },
+
+    recordHealth(providerId, healthy, evidence, checkedAt): ProviderResponse | null {
+      const provider = providers.get(providerId);
+      if (!provider) return null;
+      if (evidence.trim().length === 0) {
+        throw new Error("Provider health evidence must not be empty.");
+      }
+      const updated: ProviderResponse = {
+        ...provider,
+        healthy,
+        healthCheckedAt: checkedAt ?? new Date().toISOString(),
+        healthEvidence: evidence,
+      };
+      providers.set(providerId, updated);
+      return updated;
     },
 
     acceptRelease(providerId: EntityId, decision: ReleaseDecision): ProviderResponse | null {

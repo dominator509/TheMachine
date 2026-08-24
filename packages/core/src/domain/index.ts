@@ -11,7 +11,12 @@ export type {
   Priority,
 } from "./types.js";
 
-export type { Workspace, RepositoryProfile, BlueprintPack } from "./workspace.js";
+export type {
+  Workspace,
+  RepositoryPackageManager,
+  RepositoryProfile,
+  BlueprintPack,
+} from "./workspace.js";
 
 export type {
   ExecPlanStatus,

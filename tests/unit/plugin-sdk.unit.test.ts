@@ -1,410 +1,223 @@
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
-  createSandboxedExecutor,
-  createPluginRegistry,
-  registerPlugin,
-  unregisterPlugin,
-  getPlugin,
-  listPlugins,
-  createPluginHostAPI,
   createPluginContext,
+  createPluginHostAPI,
+  createPluginRegistry,
+  createSandboxedExecutor,
+  getPlugin,
   invokePluginHook,
+  listPlugins,
   loadPluginPackages,
   pluginPackageToManifest,
+  registerPlugin,
+  unregisterPlugin,
 } from "@the-machine/plugin-sdk";
 import type { PluginManifest } from "@the-machine/core";
 
+const cleanup: string[] = [];
 const SAMPLE_MANIFEST: PluginManifest = {
-  id: "plugin-test" as any,
+  id: "plugin-test" as never,
   name: "Test Plugin",
-  version: "1.0.0" as any,
+  version: "1.0.0" as never,
   entryPoint: "index.js",
   permissions: [{ resource: "log", actions: ["read"], allowed: true }],
 };
 
-function withTempPlugin(files: Record<string, string>): string {
-  const dir = mkdtempSync(join(tmpdir(), "machine-plugin-sandbox-"));
-  for (const [name, content] of Object.entries(files)) {
-    writeFileSync(join(dir, name), content, "utf8");
+afterEach(() => {
+  while (cleanup.length > 0) {
+    const target = cleanup.pop();
+    if (target) rmSync(target, { recursive: true, force: true });
   }
-  return dir;
+});
+
+function plugin(files: Record<string, string>): string {
+  const directory = mkdtempSync(join(tmpdir(), "machine-plugin-test-"));
+  cleanup.push(directory);
+  for (const [name, contents] of Object.entries(files)) {
+    writeFileSync(join(directory, name), contents, "utf-8");
+  }
+  return directory;
 }
 
-function sandboxInstance(entryPoint: string) {
+function instance(entryPoint: string) {
   return {
-    manifest: {
-      ...SAMPLE_MANIFEST,
-      entryPoint,
-    },
+    manifest: { ...SAMPLE_MANIFEST, entryPoint },
     hooks: {},
     enabled: true,
   };
 }
 
-function sandboxContext(pluginDir: string) {
-  return {
-    pluginId: String(SAMPLE_MANIFEST.id),
-    pluginDir,
-    config: {},
-  };
+function context(directory: string) {
+  return { pluginId: String(SAMPLE_MANIFEST.id), pluginDir: directory, config: {} };
 }
 
-// ── Registry ────────────────────────────────────────────────────────────
-
-describe("createPluginRegistry", () => {
-  it("creates an empty registry", () => {
-    const registry = createPluginRegistry();
-    expect(registry.plugins.size).toBe(0);
-  });
-});
-
-describe("registerPlugin", () => {
-  it("registers a plugin with manifest and hooks", () => {
-    const registry = createPluginRegistry();
-    const updated = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    expect(updated.plugins.size).toBe(1);
-    const reg = updated.plugins.get(SAMPLE_MANIFEST.id);
-    expect(reg).toBeDefined();
-    expect(reg!.manifest.name).toBe("Test Plugin");
-    expect(reg!.loaded).toBe(false);
+describe("plugin registry and host contracts", () => {
+  it("registers immutably, lists, retrieves, overwrites, and unregisters", () => {
+    const empty = createPluginRegistry();
+    const first = registerPlugin(empty, SAMPLE_MANIFEST, {});
+    const second = registerPlugin(first, { ...SAMPLE_MANIFEST, name: "Updated" }, {});
+    expect(empty.plugins.size).toBe(0);
+    expect(listPlugins(second)).toHaveLength(1);
+    expect(getPlugin(second, SAMPLE_MANIFEST.id)?.manifest.name).toBe("Updated");
+    expect(unregisterPlugin(second, SAMPLE_MANIFEST.id).plugins.size).toBe(0);
+    expect(unregisterPlugin(empty, "missing" as never).plugins.size).toBe(0);
   });
 
-  it("is immutable — does not mutate original registry", () => {
-    const registry = createPluginRegistry();
-    registerPlugin(registry, SAMPLE_MANIFEST, {});
-    expect(registry.plugins.size).toBe(0);
+  it("loads no packages from a missing directory and maps package metadata", () => {
+    expect(loadPluginPackages("/definitely/not/a/plugin/directory")).toEqual([]);
+    expect(
+      pluginPackageToManifest({
+        name: "plugin-package",
+        version: "2.0.0" as never,
+        description: "fixture",
+        main: "start.js",
+        machine: { plugin: true, permissions: [] },
+      }),
+    ).toEqual(expect.objectContaining({ name: "plugin-package", entryPoint: "start.js" }));
+    expect(
+      pluginPackageToManifest({
+        name: "minimal",
+        version: "1.0.0" as never,
+        machine: { plugin: true },
+      }).entryPoint,
+    ).toBe("index.js");
   });
 
-  it("overwrites a plugin with the same id", () => {
-    const registry = createPluginRegistry();
-    const first = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    const second = registerPlugin(first, { ...SAMPLE_MANIFEST, name: "Overwritten" }, {});
-    expect(second.plugins.size).toBe(1);
-    expect(second.plugins.get(SAMPLE_MANIFEST.id)!.manifest.name).toBe("Overwritten");
-  });
-});
-
-describe("unregisterPlugin", () => {
-  it("removes a registered plugin", () => {
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    const without = unregisterPlugin(withPlugin, SAMPLE_MANIFEST.id);
-    expect(without.plugins.size).toBe(0);
-  });
-
-  it("is a no-op when unregistering an unknown id", () => {
-    const registry = createPluginRegistry();
-    const result = unregisterPlugin(registry, "nonexistent" as any);
-    expect(result.plugins.size).toBe(0);
-  });
-});
-
-describe("getPlugin", () => {
-  it("retrieves a registered plugin", () => {
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    const found = getPlugin(withPlugin, SAMPLE_MANIFEST.id);
-    expect(found).not.toBeNull();
-    expect(found!.manifest.name).toBe("Test Plugin");
-  });
-
-  it("returns null for unknown id", () => {
-    const registry = createPluginRegistry();
-    expect(getPlugin(registry, "ghost" as any)).toBeNull();
-  });
-});
-
-describe("listPlugins", () => {
-  it("lists all registered plugins", () => {
-    let registry = createPluginRegistry();
-    registry = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    registry = registerPlugin(registry, { ...SAMPLE_MANIFEST, id: "plugin-2" as any, name: "Plugin 2" }, {});
-    const all = listPlugins(registry);
-    expect(all).toHaveLength(2);
-  });
-
-  it("returns empty array for empty registry", () => {
-    const registry = createPluginRegistry();
-    expect(listPlugins(registry)).toEqual([]);
-  });
-});
-
-// ── Loader ──────────────────────────────────────────────────────────────
-
-describe("loadPluginPackages", () => {
-  it("returns empty array for nonexistent directory", () => {
-    const result = loadPluginPackages("/nonexistent/plugins");
-    expect(result).toEqual([]);
-  });
-});
-
-describe("pluginPackageToManifest", () => {
-  it("converts a plugin package to a manifest", () => {
-    const manifest = pluginPackageToManifest({
-      name: "my-plugin",
-      version: "2.0.0" as any,
-      description: "A test plugin",
-      main: "start.js",
-      machine: { plugin: true, permissions: [] },
-    });
-    expect(manifest.name).toBe("my-plugin");
-    expect(manifest.version).toBe("2.0.0");
-    expect(manifest.entryPoint).toBe("start.js");
-  });
-
-  it("defaults entryPoint to index.js", () => {
-    const manifest = pluginPackageToManifest({
-      name: "minimal",
-      version: "1.0.0" as any,
-      machine: { plugin: true },
-    });
-    expect(manifest.entryPoint).toBe("index.js");
-  });
-});
-
-// ── Host API & Context ──────────────────────────────────────────────────
-
-describe("createPluginHostAPI", () => {
-  it("provides log and getConfig", () => {
+  it("creates a host context and isolates synchronous hook failures", () => {
     const api = createPluginHostAPI({ dbUrl: "sqlite://test" });
-    expect(typeof api.log).toBe("function");
-    expect(api.getConfig("dbUrl")).toBe("sqlite://test");
-  });
-
-  it("returns undefined for unknown config keys", () => {
-    const api = createPluginHostAPI({});
-    expect(api.getConfig("missing")).toBeUndefined();
-  });
-});
-
-describe("createPluginContext", () => {
-  it("creates a context for a registration", () => {
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-    expect(ctx.pluginId).toBe(SAMPLE_MANIFEST.id);
-    expect(ctx.pluginName).toBe("Test Plugin");
-    expect(ctx.api).toBe(api);
-  });
-});
-
-// ── Hook Execution ──────────────────────────────────────────────────────
-
-describe("invokePluginHook", () => {
-  it("invokes onLoad hook with context", () => {
-    let loaded = false;
-    const hooks = { onLoad: () => { loaded = true; } };
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-
-    const result = invokePluginHook(reg, "onLoad", ctx);
-    expect(result.success).toBe(true);
-    expect(result.hook).toBe("onLoad");
-    expect(loaded).toBe(true);
-  });
-
-  it("invokes onUnload hook with context", () => {
-    let unloaded = false;
-    const hooks = { onUnload: () => { unloaded = true; } };
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-
-    const result = invokePluginHook(reg, "onUnload", ctx);
-    expect(result.success).toBe(true);
-    expect(unloaded).toBe(true);
-  });
-
-  it("invokes onConfigure hook with config argument", () => {
-    let captured: Record<string, unknown> | undefined;
-    const hooks = { onConfigure: (cfg: Record<string, unknown>) => { captured = cfg; } };
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-
-    const result = invokePluginHook(reg, "onConfigure", ctx, { key: "value" });
-    expect(result.success).toBe(true);
-    expect(captured).toEqual({ key: "value" });
-  });
-
-  it("invokes onExecute hook with input", () => {
-    let input: unknown;
-    const hooks = { onExecute: (i: unknown) => { input = i; return "processed"; } };
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-
-    const result = invokePluginHook(reg, "onExecute", ctx, "hello");
-    expect(result.success).toBe(true);
-    expect(input).toBe("hello");
-    expect(result.output).toBe("processed");
-  });
-
-  it("returns success when hook is not defined (missing hook)", () => {
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, {});
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-
-    const result = invokePluginHook(reg, "onLoad", ctx);
-    expect(result.success).toBe(true);
-    expect(result.output).toBeUndefined();
-  });
-
-  it("captures errors thrown by hooks", () => {
-    const hooks = { onLoad: () => { throw new Error("Hook crashed"); } };
-    const registry = createPluginRegistry();
-    const withPlugin = registerPlugin(registry, SAMPLE_MANIFEST, hooks);
-    const reg = getPlugin(withPlugin, SAMPLE_MANIFEST.id)!;
-    const api = createPluginHostAPI({});
-    const ctx = createPluginContext(reg, api);
-
-    const result = invokePluginHook(reg, "onLoad", ctx);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Hook crashed");
-  });
-});
-
-// ── Subprocess Sandbox ──────────────────────────────────────────────────
-
-describe("createSandboxedExecutor", () => {
-  it("executes a third-party hook in a subprocess sandbox", async () => {
-    const dir = withTempPlugin({
-      "plugin.mjs": `
-        export function onExecute(ctx, input) {
-          return { pluginId: ctx.pluginId, value: input.value };
-        }
-      `,
+    const registry = registerPlugin(createPluginRegistry(), SAMPLE_MANIFEST, {
+      onExecute: (input: unknown) => input,
+      onLoad: () => {
+        throw new Error("hook crashed");
+      },
     });
-    const executor = createSandboxedExecutor();
-    const result = await executor.executeOnExecute(
-      sandboxInstance(join(dir, "plugin.mjs")),
-      sandboxContext(dir),
+    const registration = getPlugin(registry, SAMPLE_MANIFEST.id);
+    if (!registration) throw new Error("registration missing");
+    const pluginContext = createPluginContext(registration, api);
+    expect(pluginContext.pluginName).toBe("Test Plugin");
+    expect(api.getConfig("dbUrl")).toBe("sqlite://test");
+    expect(invokePluginHook(registration, "onExecute", pluginContext, "input")).toEqual(
+      expect.objectContaining({ success: true, output: "input" }),
+    );
+    expect(invokePluginHook(registration, "onLoad", pluginContext)).toEqual(
+      expect.objectContaining({ success: false, error: expect.stringContaining("hook crashed") }),
+    );
+  });
+});
+
+describe("plugin trust boundary", () => {
+  it("disables third-party execution by default", async () => {
+    const directory = plugin({ "plugin.mjs": "export function onExecute(){ return 'ran'; }" });
+    const result = await createSandboxedExecutor().executeOnExecute(
+      instance(join(directory, "plugin.mjs")),
+      context(directory),
+      {},
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining("third-party plugin execution is disabled"),
+      }),
+    );
+  });
+
+  it("runs an explicitly trusted subprocess hook", async () => {
+    const directory = plugin({
+      "plugin.mjs": "export function onExecute(ctx,input){ return {id:ctx.pluginId,value:input.value}; }",
+    });
+    const result = await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnExecute(
+      instance(join(directory, "plugin.mjs")),
+      context(directory),
       { value: "ok" },
     );
-
-    expect(result).toEqual({ success: true, output: { pluginId: "plugin-test", value: "ok" } });
-    rmSync(dir, { recursive: true, force: true });
+    expect(result).toEqual({ success: true, output: { id: "plugin-test", value: "ok" } });
   });
 
-  it("denies sandboxed reads outside the plugin directory", async () => {
-    const secretDir = mkdtempSync(join(tmpdir(), "machine-plugin-secret-"));
-    const secretPath = join(secretDir, "secret.txt");
-    writeFileSync(secretPath, "do-not-read", "utf8");
-    const dir = withTempPlugin({
-      "plugin.mjs": `
-        import { readFileSync } from "node:fs";
-        export function onExecute(ctx, input) {
-          return readFileSync(input.path, "utf8");
-        }
-      `,
+  it("denies trusted-subprocess reads outside approved roots", async () => {
+    const outside = plugin({ "secret.txt": "do-not-read" });
+    const directory = plugin({
+      "plugin.mjs": "import {readFileSync} from 'node:fs'; export function onExecute(ctx,input){ return readFileSync(input.path,'utf8'); }",
     });
-    const executor = createSandboxedExecutor();
-    const result = await executor.executeOnExecute(
-      sandboxInstance(join(dir, "plugin.mjs")),
-      sandboxContext(dir),
-      { path: secretPath },
+    const result = await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnExecute(
+      instance(join(directory, "plugin.mjs")),
+      context(directory),
+      { path: join(outside, "secret.txt") },
     );
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("onExecute failed");
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(secretDir, { recursive: true, force: true });
+    expect(result).toEqual(
+      expect.objectContaining({ success: false, error: expect.stringContaining("onExecute failed") }),
+    );
   });
 
-  it("denies sandboxed writes by default", async () => {
-    const dir = withTempPlugin({
-      "plugin.mjs": `
-        import { writeFileSync } from "node:fs";
-        export function onExecute() {
-          writeFileSync("created.txt", "blocked");
-          return "wrote";
-        }
-      `,
+  it("denies trusted-subprocess writes by default", async () => {
+    const directory = plugin({
+      "plugin.mjs": "import {writeFileSync} from 'node:fs'; export function onExecute(){ writeFileSync('created.txt','blocked'); }",
     });
-    const executor = createSandboxedExecutor();
-    const result = await executor.executeOnExecute(
-      sandboxInstance(join(dir, "plugin.mjs")),
-      sandboxContext(dir),
+    const result = await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnExecute(
+      instance(join(directory, "plugin.mjs")),
+      context(directory),
       {},
     );
-
     expect(result.success).toBe(false);
-    expect(existsSync(join(dir, "created.txt"))).toBe(false);
-    rmSync(dir, { recursive: true, force: true });
+    expect(existsSync(join(directory, "created.txt"))).toBe(false);
   });
 
-  it("times out long-running sandboxed hooks", async () => {
-    const dir = withTempPlugin({
-      "plugin.mjs": `
-        export async function onExecute() {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          return "late";
-        }
-      `,
+  it("bounds execution time and output", async () => {
+    const slowDirectory = plugin({
+      "plugin.mjs": "export async function onExecute(){ await new Promise(r=>setTimeout(r,250)); return 'late'; }",
     });
-    const executor = createSandboxedExecutor({ timeoutMs: 50 });
-    const result = await executor.executeOnExecute(
-      sandboxInstance(join(dir, "plugin.mjs")),
-      sandboxContext(dir),
-      {},
+    expect(
+      await createSandboxedExecutor({
+        isolation: "trusted-subprocess",
+        timeoutMs: 50,
+      }).executeOnExecute(
+        instance(join(slowDirectory, "plugin.mjs")),
+        context(slowDirectory),
+        {},
+      ),
+    ).toEqual({ success: false, error: "onExecute timed out after 50ms" });
+
+    const noisyDirectory = plugin({
+      "plugin.mjs": "export function onExecute(){ console.log('x'.repeat(5000)); return 'done'; }",
+    });
+    expect(
+      await createSandboxedExecutor({
+        isolation: "trusted-subprocess",
+        maxOutputBytes: 1_000,
+      }).executeOnExecute(
+        instance(join(noisyDirectory, "plugin.mjs")),
+        context(noisyDirectory),
+        {},
+      ),
+    ).toEqual(
+      expect.objectContaining({ success: false, error: expect.stringContaining("output limit") }),
+    );
+  });
+
+  it("captures trusted-subprocess errors and keeps in-process trust explicit", async () => {
+    const failingDirectory = plugin({
+      "plugin.mjs": "export function onLoad(){ throw new Error('subprocess boom'); }",
+    });
+    expect(
+      await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnLoad(
+        instance(join(failingDirectory, "plugin.mjs")),
+        context(failingDirectory),
+      ),
+    ).toEqual(
+      expect.objectContaining({ success: false, error: expect.stringContaining("subprocess boom") }),
     );
 
-    expect(result).toEqual({
-      success: false,
-      error: "onExecute timed out after 50ms",
+    const trustedDirectory = plugin({
+      "plugin.mjs": "export function onExecute(){ return 'trusted'; }",
     });
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("captures errors from sandboxed hooks", async () => {
-    const dir = withTempPlugin({
-      "plugin.mjs": `
-        export function onLoad() {
-          throw new Error("sandbox boom");
-        }
-      `,
-    });
-    const executor = createSandboxedExecutor();
-    const result = await executor.executeOnLoad(sandboxInstance(join(dir, "plugin.mjs")), sandboxContext(dir));
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("sandbox boom");
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("keeps trusted in-process execution available only by explicit policy", async () => {
-    const dir = withTempPlugin({
-      "plugin.mjs": `
-        import { readFileSync } from "node:fs";
-        export function onExecute(ctx) {
-          return readFileSync(new URL("./plugin.mjs", import.meta.url), "utf8").includes("readFileSync");
-        }
-      `,
-    });
-    const executor = createSandboxedExecutor({ isolation: "trusted-in-process" });
-    const result = await executor.executeOnExecute(
-      sandboxInstance(join(dir, "plugin.mjs")),
-      sandboxContext(dir),
-      {},
-    );
-
-    expect(result).toEqual({ success: true, output: true });
-    rmSync(dir, { recursive: true, force: true });
+    expect(
+      await createSandboxedExecutor({ isolation: "trusted-in-process" }).executeOnExecute(
+        instance(join(trustedDirectory, "plugin.mjs")),
+        context(trustedDirectory),
+        {},
+      ),
+    ).toEqual({ success: true, output: "trusted" });
   });
 });

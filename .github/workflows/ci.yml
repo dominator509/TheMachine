@@ -6,58 +6,161 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: machine-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+
 jobs:
-  verify:
+  static:
+    name: Static and identity gates
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: ./scripts/preflight.sh
+      - run: pnpm run lint
+      - run: pnpm run format:check
+      - run: pnpm run typecheck
+      - run: pnpm run version:check
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:unit
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run test:integration
+
+  e2e:
+    name: Functional E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build
+      - run: pnpm run build:release
+      - run: pnpm run test:e2e
+
+  security:
+    name: Security and dependency gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run security:check
+      - run: pnpm run audit
+
+  benchmark:
+    name: Credential-free benchmark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run benchmark:smoke
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          fetch-depth: 0
+          name: benchmark-${{ github.sha }}
+          path: benchmark-results/
+          if-no-files-found: warn
+          retention-days: 30
 
-      - uses: actions/setup-node@v4
+  release-smoke:
+    name: CLI release and smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:release
+      - run: pnpm run smoke
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          node-version: "22.13.1"
+          name: cli-release-${{ github.sha }}
+          path: release/
+          if-no-files-found: warn
+          retention-days: 30
 
-      - name: Install pinned pnpm
-        uses: pnpm/action-setup@v4
+  readiness:
+    name: Complete executable readiness profile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: "22.13.1" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with: { version: 11.6.0, run_install: false }
+      - run: pnpm install --frozen-lockfile
+      - name: Execute all readiness gates without early-exit masking
+        run: >-
+          node tools/readiness/production-readiness-check.mjs
+          --profile ci
+          --output artifacts/readiness/READINESS_EVIDENCE.json
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          version: 11.6.0
-          run_install: false
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Preflight
-        run: ./scripts/preflight.sh
-
-      - name: Lint
-        run: ./scripts/lint.sh
-
-      - name: Format check
-        run: ./scripts/format-check.sh
-
-      - name: Typecheck
-        run: ./scripts/typecheck.sh
-
-      - name: Unit tests
-        run: ./scripts/test-unit.sh
-
-      - name: Integration tests
-        run: ./scripts/test-integration.sh
-
-      - name: E2E tests
-        run: ./scripts/test-e2e.sh
-
-      - name: Build
-        run: ./scripts/build.sh
-
-      - name: Security check
-        run: ./scripts/security-check.sh
-
-      - name: Dependency audit
-        run: ./scripts/dependency-audit.sh
-
-      - name: Smoke test
-        run: ./scripts/smoke-test.sh
+          name: readiness-${{ github.sha }}
+          path: artifacts/readiness/
+          if-no-files-found: warn
+          retention-days: 30

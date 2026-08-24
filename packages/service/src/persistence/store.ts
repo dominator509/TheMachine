@@ -1,6 +1,6 @@
-import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { legacyCommandToSpec, runSafeProcessSync } from "@the-machine/agent-runtime";
 import type { ActivityStatus, EntityId, Priority, Severity } from "@the-machine/core";
 import {
   ALL_MIGRATIONS,
@@ -15,6 +15,7 @@ import type { ValidationResponse } from "../contracts/validation.js";
 
 const DEFAULT_WORKSPACE_ID = "default" as EntityId;
 const DEFAULT_DB_PATH = resolve(process.cwd(), ".machine", "the-machine.db");
+const LEGACY_EXECUTION_FLAG = "MACHINE_ALLOW_LEGACY_PLAN_EXECUTION";
 
 interface ParsedMilestone {
   readonly id: EntityId;
@@ -44,6 +45,7 @@ interface ExecPlanRow {
 interface MilestoneRow {
   readonly id: EntityId;
   readonly validation_command: string | null;
+  readonly expected_result: string | null;
 }
 
 interface CountRow {
@@ -63,8 +65,13 @@ function milestoneStatus(label: string, content: string): ActivityStatus {
   return new RegExp(`^- \\[x\\] ${label}\\b`, "im").test(content) ? "completed" : "pending";
 }
 
+function legacyExecutionAllowed(): boolean {
+  return process.env[LEGACY_EXECUTION_FLAG] === "1";
+}
+
 export function parseExecPlanMarkdown(filePath: string): ParsedExecPlan {
-  const content = existsSync(filePath) ? readFileSync(filePath, "utf-8") : "";
+  if (!existsSync(filePath)) throw new Error(`ExecPlan file not found: ${filePath}`);
+  const content = readFileSync(filePath, "utf-8");
   const parsedTitle = /^#\s+(.+)$/m.exec(content)?.[1]?.trim();
   const title = parsedTitle && parsedTitle.length > 0 ? parsedTitle : "Loaded Plan";
   const matches = Array.from(content.matchAll(/^###\s+(M\d+):\s*(.+)$/gm));
@@ -86,7 +93,10 @@ export function parseExecPlanMarkdown(filePath: string): ParsedExecPlan {
       recoveryInstruction: recoveryLine?.[1]?.trim() ?? null,
     };
   });
-  const allDone = milestones.length > 0 && milestones.every((m) => m.status === "completed");
+  if (milestones.length === 0) {
+    throw new Error(`ExecPlan contains no executable milestones: ${filePath}`);
+  }
+  const allDone = milestones.every((milestone) => milestone.status === "completed");
   return {
     id: filePath as EntityId,
     title,
@@ -121,8 +131,9 @@ export class ServiceStore {
   }
 
   loadPlan(filePath: string, workspaceId = DEFAULT_WORKSPACE_ID): PlanResponse {
+    const absolutePath = resolve(filePath);
     this.ensureWorkspace(workspaceId, process.cwd());
-    const parsed = parseExecPlanMarkdown(filePath);
+    const parsed = parseExecPlanMarkdown(absolutePath);
     this.conn.db
       .prepare(
         `INSERT INTO execplans (id, workspace_id, title, status, priority)
@@ -195,8 +206,8 @@ export class ServiceStore {
       .prepare("SELECT id FROM execplans ORDER BY updated_at DESC, id ASC")
       .all() as { id: string }[];
     return rows
-      .map((r) => this.getPlan(r.id as EntityId))
-      .filter((p): p is PlanResponse => p !== null);
+      .map((row) => this.getPlan(row.id as EntityId))
+      .filter((plan): plan is PlanResponse => plan !== null);
   }
 
   startRun(planId: EntityId, requestedMilestoneId?: EntityId): RunResponse {
@@ -205,40 +216,101 @@ export class ServiceStore {
     const milestone = this.selectMilestone(planId, requestedMilestoneId);
     const runId = nowId("run");
     this.conn.db
-      .prepare("INSERT INTO agent_runs (id, execplan_id, milestone_id, status) VALUES (?, ?, ?, 'active')")
+      .prepare(
+        "INSERT INTO agent_runs (id, execplan_id, milestone_id, status) VALUES (?, ?, ?, 'active')",
+      )
       .run(runId, planId, milestone?.id ?? null);
-    if (!milestone?.validation_command) {
-      this.markRun(runId, "completed");
+
+    if (!milestone) {
+      if (plan.milestoneCount > 0 && plan.completedMilestones === plan.milestoneCount) {
+        this.markRun(runId, "completed");
+        this.markPlan(planId, "completed");
+      } else {
+        this.recordValidation(
+          runId,
+          "milestone-selection",
+          false,
+          null,
+          "No pending milestone could be selected.",
+          "error",
+        );
+        this.markRun(runId, "failed");
+        this.markPlan(planId, "failed");
+      }
+      return this.savedRun(runId);
+    }
+
+    if (!milestone.validation_command) {
+      this.recordValidation(
+        runId,
+        "validation-policy",
+        false,
+        null,
+        "Milestones cannot complete without a deterministic validation command.",
+        "error",
+      );
+      this.markMilestone(milestone.id, "failed");
+      this.markRun(runId, "failed");
+      this.markPlan(planId, "failed");
+      return this.savedRun(runId);
+    }
+
+    if (!legacyExecutionAllowed()) {
+      this.recordValidation(
+        runId,
+        milestone.validation_command,
+        false,
+        null,
+        `Legacy Markdown command execution is disabled. Use a versioned .machine.json plan and the agentic runtime, or explicitly set ${LEGACY_EXECUTION_FLAG}=1 for a trusted local compatibility run.`,
+        "warning",
+      );
+      this.markMilestone(milestone.id, "stopped");
+      this.markRun(runId, "stopped");
+      this.markPlan(planId, "stopped");
       return this.savedRun(runId);
     }
 
     const started = Date.now();
-    let stdout: string;
-    let stderr = "";
-    let exitCode = 0;
+    let exitCode = 1;
+    let stdout = "";
+    let stderr: string;
     try {
-      stdout = execSync(milestone.validation_command, {
-        cwd: process.cwd(),
-        encoding: "utf-8",
-        timeout: 30000,
+      const spec = legacyCommandToSpec(milestone.validation_command, process.cwd());
+      const result = runSafeProcessSync({
+        ...spec,
+        timeoutMs: 30_000,
+        maxOutputBytes: 2 * 1024 * 1024,
       });
-    } catch (err) {
-      const execErr = err as { status?: number; stdout?: string; stderr?: string; message?: string };
-      exitCode = execErr.status ?? 1;
-      stdout = execErr.stdout ?? "";
-      stderr = execErr.stderr ?? execErr.message ?? "";
+      exitCode = result.exitCode;
+      stdout = result.stdout;
+      stderr = result.stderr;
+    } catch (error) {
+      stderr = error instanceof Error ? error.message : String(error);
     }
-    this.recordCommand(runId, milestone.validation_command, exitCode, stdout, stderr, Date.now() - started);
+
+    const output = `${stdout}${stderr}`;
+    const expectedMatched =
+      milestone.expected_result === null || output.includes(milestone.expected_result);
+    const passed = exitCode === 0 && expectedMatched;
+    this.recordCommand(
+      runId,
+      milestone.validation_command,
+      exitCode,
+      stdout,
+      stderr,
+      Date.now() - started,
+    );
     this.recordValidation(
       runId,
       milestone.validation_command,
-      exitCode === 0,
+      passed,
       exitCode,
-      `${stdout}${stderr}`,
-      exitCode === 0 ? "info" : "error",
+      output,
+      passed ? "info" : "error",
     );
-    this.markMilestone(milestone.id, exitCode === 0 ? "completed" : "failed");
-    this.markRun(runId, exitCode === 0 ? "completed" : "failed");
+    this.markMilestone(milestone.id, passed ? "completed" : "failed");
+    this.markRun(runId, passed ? "completed" : "failed");
+    this.refreshPlanStatus(planId, passed);
     return this.savedRun(runId);
   }
 
@@ -272,10 +344,14 @@ export class ServiceStore {
   }
 
   listRuns(): RunResponse[] {
-    const rows = this.conn.db.prepare("SELECT id FROM agent_runs ORDER BY created_at DESC").all() as {
+    const rows = this.conn.db
+      .prepare("SELECT id FROM agent_runs ORDER BY created_at DESC")
+      .all() as {
       id: string;
     }[];
-    return rows.map((r) => this.getRun(r.id as EntityId)).filter((r): r is RunResponse => r !== null);
+    return rows
+      .map((row) => this.getRun(row.id as EntityId))
+      .filter((run): run is RunResponse => run !== null);
   }
 
   recordValidation(
@@ -297,7 +373,9 @@ export class ServiceStore {
 
   listValidations(runId: EntityId): ValidationResponse[] {
     const rows = this.conn.db
-      .prepare("SELECT command, passed, exit_code, output, severity FROM validations WHERE run_id = ?")
+      .prepare(
+        "SELECT command, passed, exit_code, output, severity FROM validations WHERE run_id = ?",
+      )
       .all(runId) as {
       command: string;
       passed: number;
@@ -305,13 +383,13 @@ export class ServiceStore {
       output: string | null;
       severity: Severity;
     }[];
-    return rows.map((r) => ({
+    return rows.map((row) => ({
       runId,
-      command: r.command,
-      passed: r.passed === 1,
-      exitCode: r.exit_code,
-      output: r.output ?? "",
-      severity: r.severity,
+      command: row.command,
+      passed: row.passed === 1,
+      exitCode: row.exit_code,
+      output: row.output ?? "",
+      severity: row.severity,
     }));
   }
 
@@ -319,14 +397,16 @@ export class ServiceStore {
     if (requestedMilestoneId) {
       return (
         (this.conn.db
-          .prepare("SELECT id, validation_command FROM milestones WHERE id = ?")
-          .get(requestedMilestoneId) as MilestoneRow | undefined) ?? null
+          .prepare(
+            "SELECT id, validation_command, expected_result FROM milestones WHERE id = ? AND execplan_id = ? AND status != 'completed'",
+          )
+          .get(requestedMilestoneId, planId) as MilestoneRow | undefined) ?? null
       );
     }
     return (
       (this.conn.db
         .prepare(
-          "SELECT id, validation_command FROM milestones WHERE execplan_id = ? AND status != 'completed' ORDER BY rowid LIMIT 1",
+          "SELECT id, validation_command, expected_result FROM milestones WHERE execplan_id = ? AND status != 'completed' ORDER BY rowid LIMIT 1",
         )
         .get(planId) as MilestoneRow | undefined) ?? null
     );
@@ -344,10 +424,31 @@ export class ServiceStore {
       .run(status, runId);
   }
 
+  private markPlan(planId: EntityId, status: ActivityStatus): void {
+    this.conn.db
+      .prepare("UPDATE execplans SET status = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(status, planId);
+  }
+
   private markMilestone(milestoneId: EntityId, status: ActivityStatus): void {
     this.conn.db
       .prepare("UPDATE milestones SET status = ?, updated_at = datetime('now') WHERE id = ?")
       .run(status, milestoneId);
+  }
+
+  private refreshPlanStatus(planId: EntityId, lastValidationPassed: boolean): void {
+    if (!lastValidationPassed) {
+      this.markPlan(planId, "failed");
+      return;
+    }
+    const remaining = (
+      this.conn.db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM milestones WHERE execplan_id = ? AND status != 'completed'",
+        )
+        .get(planId) as CountRow
+    ).count;
+    this.markPlan(planId, remaining === 0 ? "completed" : "pending");
   }
 
   private recordCommand(

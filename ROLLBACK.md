@@ -1,132 +1,107 @@
-# ROLLBACK.md
+# Rollback Runbook
 
-## Rollback Triggers
+Rollback is an operator-controlled recovery operation. Agents may prepare commands and evidence, but they must not execute a destructive restore or production deployment without explicit authorization.
 
-Rollback is initiated when any of the following occur:
+## Preconditions
 
-- Smoke test failure after retry budget (3 same-root attempts per AGENTS.md anti-fixation rules).
-- Data loss or corruption detected.
-- Critical security issue per SPEC-008 (fail closed on security).
-- Application startup failure or crash loop.
-- Migration corruption or block.
-- Broken core outcome (CLI, service, desktop workspace).
-- User request.
-- SPEC-008 error state encountered without recovery path (validation failed, persistence failure, integration failure).
+A rollback may proceed only when all of the following are true:
 
-## Rollback Decision Owner
+1. The application is stopped and no process holds the SQLite database open.
+2. The exact previous application artifact and its checksum are available.
+3. A pre-upgrade SQLite backup exists and its SHA-256 digest is known.
+4. The database has no `-wal` or `-shm` sidecar. Their presence causes the restore tool to fail closed.
+5. The operator has recorded the current version, target version, backup timestamp, expected data-loss window, and approval.
 
-- Release operator or user. Coding agents must not execute production rollback without explicit permission per AGENTS.md STOP conditions.
-- For staging/local rollback, the operator may proceed without approval but must document the action.
+The project has no reversible down migrations. Database rollback means restoring an exact verified backup.
 
-## Rollback Types
+## Create a Pre-Upgrade Backup
 
-- Application rollback
-- Database rollback
-- Config rollback
-- Feature flag rollback (if applicable)
-- Plugin rollback
+Build the storage package, then create and record a verified backup:
 
-## Application Rollback
+```sh
+pnpm build
+pnpm db:backup .machine/backups/pre-upgrade.sqlite
+```
 
-1. **Preserve diagnostics** — Before stopping the app, export redacted diagnostics:
-
-   ```sh
-   CLI diagnostics
-   ```
-
-   This produces a redacted diagnostic bundle with no secrets per SPEC-008 observability rules.
-
-2. **Stop app** — Kill the running process.
-
-3. **Install previous version** — Deploy the previous release bundle from `release/` (retained from prior release).
-
-4. **Run verification**:
-
-   ```sh
-   CLI health      # Must return "health: ok"
-   CLI readiness   # Must return "Overall: ready"
-   ```
-
-5. **Confirm workspace** — Open the desktop workspace selector; verify read-only repository discovery works.
-
-6. **Record result** — Log version rolled from, version rolled to, and verification status.
+The command prints the source path, backup path, byte size, schema counts, timestamp, and SHA-256 digest. Preserve that output with the release evidence.
 
 ## Database Rollback
 
-1. **Stop app** — Prevent writes during rollback.
-2. **Locate pre-migration backup** — Backups are stored per SPEC-008 data rules (local persistence, schema migrations).
-3. **Archive current DB** — Preserve current state for postmortem analysis.
-4. **Restore backup**:
+1. Stop The Machine and all processes that can access its database.
+2. Preserve redacted diagnostics and a copy of the failed database for incident analysis.
+3. Set the target database explicitly when it is not the default:
+
    ```sh
-   pnpm run db:migrate:rollback
+   export MACHINE_DB_PATH=/absolute/path/to/the-machine.db
    ```
-5. **Run health and smoke**:
+
+4. Authorize and execute the exact backup restore:
+
    ```sh
-   CLI health
-   ./scripts/smoke-test.sh
+   export MACHINE_ALLOW_DB_ROLLBACK=1
+   pnpm db:migrate:rollback \
+     .machine/backups/pre-upgrade.sqlite \
+     --yes \
+     --sha256=<RECORDED_BACKUP_SHA256>
    ```
-6. **Record data impact** — Document any data loss between backup and rollback.
-7. **Requires explicit user approval** — Coding agents must STOP before any destructive database operation.
 
-## Config Rollback
+5. The restore command performs these checks and actions:
+   - rejects missing, corrupt, or checksum-mismatched backups;
+   - rejects active/incompletely checkpointed SQLite sidecars;
+   - copies the backup to a staging file;
+   - independently runs SQLite `quick_check` on the source and staging copy;
+   - atomically moves the current database aside;
+   - installs and re-verifies the restored database;
+   - restores the original database automatically if final verification fails;
+   - retains the pre-restore database for postmortem analysis.
 
-1. **Export current config** — Save config snapshot for comparison.
-2. **Restore prior config** — Replace config file with previous version.
-3. **Verify**:
-   ```sh
-   CLI health
-   ```
-4. **Confirm no secrets in logs** — Check diagnostics output after restart (SPEC-008 — redacted logs).
-5. **Record config change** — Log what was rolled back and why.
+6. Restart only after the exact rolled-back application artifact is installed.
+7. Run clean-start smoke, readiness, repository discovery, and data-integrity checks.
+8. Record RTO, actual data-loss interval, restored SHA-256, and the retained pre-restore path.
 
-## Feature Flag Rollback
+For a non-rollback restore operation, use the equivalent guarded command:
 
-1. **Disable the feature** — Set flag to `false` in config/flag store.
-2. **Restart service if required** — Some flags require process restart.
-3. **Run smoke tests** — `./scripts/smoke-test.sh`.
-4. **Record flag change** — Document flag name, previous value, new value, and reason.
+```sh
+export MACHINE_ALLOW_DESTRUCTIVE_RESTORE=1
+pnpm db:restore <backup.sqlite> --yes --sha256=<EXPECTED_SHA256>
+```
 
-## Verification After Rollback
+## Application Rollback
 
-After any rollback, confirm all of the following:
+Application rollback requires a previously retained release artifact, not a rebuild of the same source tag.
 
-- [ ] App starts without errors.
-- [ ] CLI starts (`CLI help`).
-- [ ] Service health passes (`CLI health` returns `health: ok`).
-- [ ] Readiness check passes (`CLI readiness` returns `Overall: ready`).
-- [ ] Database status valid (if applicable — run `pnpm run db:migrate` to verify current state).
-- [ ] Repository discovery works (workspace opens, repos readable).
-- [ ] Original error is no longer reproducible.
-- [ ] No secrets in logs or diagnostics per SPEC-008 observability rules (structured events, redacted output).
-- [ ] SPEC-008 security rules enforced post-rollback (loopback-only, deny-by-default, allowlisted commands).
+1. Verify the previous artifact checksum and provenance.
+2. Stop the current application.
+3. Install the retained previous artifact according to its platform-specific manifest.
+4. Restore a compatible database backup when the prior version cannot read the current schema.
+5. Run the exact-artifact clean-room smoke and readiness gates.
+6. Record versions, artifact digests, installer result, rollback duration, and any lost writes.
 
-## Communication
+Until signed native installers and an exact-artifact installation campaign exist, application rollback remains an external release gate rather than a completed capability.
 
-After rollback, report:
+## Verification Checklist
 
-- Version rolled _from_ and version rolled _to_.
-- Reason for rollback (from rollback triggers above).
-- User impact (downtime, data loss, feature unavailability).
-- Data impact (records lost, migration reverted).
-- Verification results (all checks listed above passed/failed).
-- Corrective ExecPlan reference (created to fix root cause).
+- [ ] Exact previous artifact digest verified.
+- [ ] Backup digest verified.
+- [ ] SQLite `quick_check` passed before and after restore.
+- [ ] No unexpected WAL/SHM sidecar remained.
+- [ ] Application started from the retained artifact.
+- [ ] CLI and native desktop smoke tests passed.
+- [ ] Candidate-bound readiness evidence was regenerated for the rolled-back artifact.
+- [ ] Repository discovery and representative data reads passed.
+- [ ] Original incident is no longer reproducible.
+- [ ] No secrets appeared in diagnostics or rollback logs.
+- [ ] RTO and data-loss interval were recorded.
 
-## Postmortem
+## STOP Conditions
 
-For any production-impacting rollback:
+Stop immediately when:
 
-1. Create an incident report documenting timeline, trigger, and resolution.
-2. Add a regression test that would have caught the issue.
-3. Update the runbook and release checklist to prevent recurrence.
-4. Record any architecture or process decisions in the Decision Log per AGENTS.md rules.
-5. Emit structured event per SPEC-008 observability rules for the rollback action.
-
-## Rollback STOP Conditions
-
-Stop and do not proceed with rollback if:
-
-- Previous release bundle is missing or corrupted (STOP — cannot roll back without a valid artifact).
-- Database backup is missing or invalid.
-- Rollback would cause greater data loss than the original incident.
-- User has explicitly denied the rollback.
-- SPEC-008 security rules would be violated by the rollback action.
+- the previous artifact or database backup is missing;
+- any checksum or SQLite integrity check fails;
+- the database is still open or sidecars remain;
+- the backup is incompatible with the target application;
+- the expected data-loss interval is unacceptable;
+- the operator has not explicitly approved the destructive operation;
+- the restore would overwrite the only surviving copy of current state;
+- a production or third-party system lies outside the authorized scope.

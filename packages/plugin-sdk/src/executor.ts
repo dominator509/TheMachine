@@ -1,37 +1,34 @@
-// Sandboxed plugin execution hooks.
-// Provides a safe execution environment for onLoad, onUnload, onConfigure, onExecute.
+// Trusted plugin execution hooks.
+// This module deliberately does not claim a hostile-code security boundary.
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { PluginContext, PluginInstance, PluginExecutionResult } from "./types.js";
 
-export type PluginSandboxIsolation = "subprocess" | "trusted-in-process";
+export type PluginSandboxIsolation =
+  | "disabled"
+  | "trusted-subprocess"
+  | "trusted-in-process"
+  | "subprocess";
 
 export interface PluginSandboxPolicy {
   readonly isolation?: PluginSandboxIsolation;
   readonly timeoutMs?: number;
+  readonly maxOutputBytes?: number;
   readonly nodePath?: string;
   readonly allowFsRead?: readonly string[];
   readonly allowFsWrite?: readonly string[];
 }
 
-/** A sandboxed executor that runs plugin hooks with error isolation. */
 export interface PluginExecutor {
-  /** Execute the onLoad hook for a plugin. */
   executeOnLoad(instance: PluginInstance, ctx: PluginContext): Promise<PluginExecutionResult>;
-
-  /** Execute the onUnload hook for a plugin. */
   executeOnUnload(instance: PluginInstance, ctx: PluginContext): Promise<PluginExecutionResult>;
-
-  /** Execute the onConfigure hook for a plugin. */
   executeOnConfigure(
     instance: PluginInstance,
     ctx: PluginContext,
     config: Record<string, unknown>,
   ): Promise<PluginExecutionResult>;
-
-  /** Execute the onExecute hook for a plugin with input. */
   executeOnExecute(
     instance: PluginInstance,
     ctx: PluginContext,
@@ -39,10 +36,11 @@ export interface PluginExecutor {
   ): Promise<PluginExecutionResult>;
 }
 
-const RESULT_PREFIX = "__MACHINE_PLUGIN_SANDBOX_RESULT__";
-const DEFAULT_TIMEOUT_MS = 3000;
+const RESULT_PREFIX = "__MACHINE_PLUGIN_SUBPROCESS_RESULT__";
+const DEFAULT_TIMEOUT_MS = 3_000;
+const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
 
-const SANDBOX_RUNNER = `
+const SUBPROCESS_RUNNER = `
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -76,17 +74,19 @@ try {
 `;
 
 /**
- * Creates a sandboxed plugin executor.
+ * Creates a plugin executor.
  *
- * The default path is for third-party plugins: hooks run in a separate Node.js
- * process with the permission model enabled, no child-process/worker/addon
- * permissions, a scrubbed environment, plugin-directory scoped reads, and a
- * timeout. `trusted-in-process` exists only for first-party/test fixtures that
- * intentionally accept the weaker isolation boundary.
+ * Third-party execution is disabled by default. `trusted-subprocess` adds useful
+ * defense in depth for operator-approved plugins, but Node's permission model is
+ * not a hostile-code sandbox. `trusted-in-process` is restricted to first-party
+ * code and tests that explicitly accept full process authority.
+ *
+ * The legacy `subprocess` value is retained as a compatibility alias for
+ * `trusted-subprocess`; callers should migrate to the explicit trust label.
  */
 export function createSandboxedExecutor(policy: PluginSandboxPolicy = {}): PluginExecutor {
   const hookCache = new Map<string, Record<string, unknown>>();
-  const isolation = policy.isolation ?? "subprocess";
+  const isolation = policy.isolation ?? "disabled";
 
   async function loadHooks(instance: PluginInstance): Promise<Record<string, unknown>> {
     const pluginId = instance.manifest.id;
@@ -94,9 +94,7 @@ export function createSandboxedExecutor(policy: PluginSandboxPolicy = {}): Plugi
     if (cached) return cached;
 
     const entryPath = resolve(instance.manifest.entryPoint);
-    if (!existsSync(entryPath)) {
-      return {};
-    }
+    if (!existsSync(entryPath)) return {};
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -116,18 +114,22 @@ export function createSandboxedExecutor(policy: PluginSandboxPolicy = {}): Plugi
     hookName: string,
     args: unknown[],
   ): Promise<PluginExecutionResult> {
-    if (isolation === "subprocess") {
-      return runHookInSubprocess(instance, hookName, args, policy);
+    if (isolation === "disabled") {
+      return {
+        success: false,
+        error:
+          `${hookName} blocked: third-party plugin execution is disabled. ` +
+          `An operator must explicitly select trusted-subprocess or trusted-in-process.`,
+      };
+    }
+    if (isolation === "trusted-subprocess" || isolation === "subprocess") {
+      return runHookInTrustedSubprocess(instance, hookName, args, policy);
     }
 
     try {
       const mod = await loadHooks(instance);
       const hookFn = mod[hookName] as ((...a: unknown[]) => unknown) | undefined;
-
-      if (typeof hookFn !== "function") {
-        return { success: true, output: undefined };
-      }
-
+      if (typeof hookFn !== "function") return { success: true, output: undefined };
       const output = await hookFn(...args);
       return { success: true, output };
     } catch (err) {
@@ -140,35 +142,31 @@ export function createSandboxedExecutor(policy: PluginSandboxPolicy = {}): Plugi
     async executeOnLoad(instance, ctx): Promise<PluginExecutionResult> {
       return runHook(instance, ctx, "onLoad", [ctx]);
     },
-
     async executeOnUnload(instance, ctx): Promise<PluginExecutionResult> {
       return runHook(instance, ctx, "onUnload", [ctx]);
     },
-
     async executeOnConfigure(instance, ctx, config): Promise<PluginExecutionResult> {
       return runHook(instance, ctx, "onConfigure", [ctx, config]);
     },
-
     async executeOnExecute(instance, ctx, input): Promise<PluginExecutionResult> {
       return runHook(instance, ctx, "onExecute", [ctx, input]);
     },
   };
 }
 
-async function runHookInSubprocess(
+async function runHookInTrustedSubprocess(
   instance: PluginInstance,
   hookName: string,
   args: unknown[],
   policy: PluginSandboxPolicy,
 ): Promise<PluginExecutionResult> {
   const entryPath = resolve(instance.manifest.entryPoint);
-  if (!existsSync(entryPath)) {
-    return { success: true, output: undefined };
-  }
+  if (!existsSync(entryPath)) return { success: true, output: undefined };
 
   const pluginDir = dirname(entryPath);
   const request = JSON.stringify({ entryPath, hookName, args });
   const timeoutMs = policy.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxOutputBytes = policy.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
   const nodePath = policy.nodePath ?? process.execPath;
   const allowFsRead = [pluginDir, ...(policy.allowFsRead ?? [])];
   const allowFsWrite = policy.allowFsWrite ?? [];
@@ -180,55 +178,75 @@ async function runHookInSubprocess(
     ...allowFsWrite.map((path) => `--allow-fs-write=${resolve(path)}`),
     "--input-type=module",
     "--eval",
-    SANDBOX_RUNNER,
+    SUBPROCESS_RUNNER,
   ];
 
   return new Promise<PluginExecutionResult>((resolveResult) => {
     const child = spawn(nodePath, nodeArgs, {
       cwd: pluginDir,
-      env: sandboxEnvironment(),
+      env: trustedSubprocessEnvironment(),
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
+      shell: false,
     });
     let stdout = "";
     let stderr = "";
+    let outputBytes = 0;
     let settled = false;
     let timedOut = false;
+    let outputExceeded = false;
     const timer = setTimeout(() => {
       if (settled) return;
       timedOut = true;
       child.kill();
     }, timeoutMs);
 
+    const capture = (stream: "stdout" | "stderr", chunk: string): void => {
+      outputBytes += Buffer.byteLength(chunk, "utf-8");
+      if (outputBytes > maxOutputBytes) {
+        outputExceeded = true;
+        child.kill();
+        return;
+      }
+      if (stream === "stdout") stdout += chunk;
+      else stderr += chunk;
+    };
+
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
+    child.stdout.on("data", (chunk: string) => capture("stdout", chunk));
+    child.stderr.on("data", (chunk: string) => capture("stderr", chunk));
     child.on("error", (err) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolveResult({ success: false, error: `${hookName} sandbox failed: ${err.message}` });
+      resolveResult({ success: false, error: `${hookName} subprocess failed: ${err.message}` });
     });
     child.on("close", () => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (timedOut) {
-      resolveResult({ success: false, error: `${hookName} timed out after ${String(timeoutMs)}ms` });
+      if (outputExceeded) {
+        resolveResult({
+          success: false,
+          error: `${hookName} exceeded the ${String(maxOutputBytes)} byte output limit`,
+        });
         return;
       }
-      resolveResult(parseSandboxResult(hookName, stdout, stderr));
+      if (timedOut) {
+        resolveResult({
+          success: false,
+          error: `${hookName} timed out after ${String(timeoutMs)}ms`,
+        });
+        return;
+      }
+      resolveResult(parseSubprocessResult(hookName, stdout, stderr));
     });
     child.stdin.end(request);
   });
 }
 
-function parseSandboxResult(
+function parseSubprocessResult(
   hookName: string,
   stdout: string,
   stderr: string,
@@ -236,7 +254,7 @@ function parseSandboxResult(
   if (stderr.includes("bad option: --permission") || stderr.includes("illegal option")) {
     return {
       success: false,
-      error: `${hookName} sandbox unsupported: Node permission model is unavailable`,
+      error: `${hookName} trusted subprocess unsupported: Node permission model is unavailable`,
     };
   }
 
@@ -245,8 +263,8 @@ function parseSandboxResult(
     .reverse()
     .find((entry) => entry.startsWith(RESULT_PREFIX));
   if (!line) {
-    const detail = stderr.trim() || stdout.trim() || "sandbox exited without result";
-    return { success: false, error: `${hookName} sandbox failed: ${detail.slice(0, 500)}` };
+    const detail = stderr.trim() || stdout.trim() || "subprocess exited without result";
+    return { success: false, error: `${hookName} subprocess failed: ${detail.slice(0, 500)}` };
   }
 
   try {
@@ -254,15 +272,17 @@ function parseSandboxResult(
     if (parsed.success) return { success: true, output: parsed.output };
     return { success: false, error: `${hookName} failed: ${parsed.error ?? "unknown"}` };
   } catch {
-    return { success: false, error: `${hookName} sandbox returned invalid result` };
+    return { success: false, error: `${hookName} subprocess returned invalid result` };
   }
 }
 
-function sandboxEnvironment(): NodeJS.ProcessEnv {
+function trustedSubprocessEnvironment(): NodeJS.ProcessEnv {
   return {
     PATH: process.env["PATH"] ?? "",
+    Path: process.env["Path"] ?? "",
     SystemRoot: process.env["SystemRoot"] ?? "",
     COMSPEC: process.env["COMSPEC"] ?? "",
+    PATHEXT: process.env["PATHEXT"] ?? "",
     TMP: process.env["TMP"] ?? "",
     TEMP: process.env["TEMP"] ?? "",
   };

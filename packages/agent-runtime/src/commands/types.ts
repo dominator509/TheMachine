@@ -1,13 +1,24 @@
-// Command registry types and allowlist.
-
-/** A registered allowed command. */
 export interface CommandEntry {
   readonly name: string;
-  readonly script: string;
   readonly description: string;
+  /**
+   * Preferred execution contract. The executable is launched directly with
+   * shell:false and each argument remains a distinct argv entry.
+   */
+  readonly executable?: string;
+  readonly args?: readonly string[];
+  readonly cwd?: string;
+  readonly timeoutMs?: number;
+  readonly environment?: Readonly<Record<string, string>>;
+  readonly passEnvironment?: readonly string[];
+  /**
+   * Backward-compatible command syntax for existing callers. It is tokenized
+   * without a shell and rejects pipes, redirects, command substitution, and
+   * shell executables. New code should use executable + args.
+   */
+  readonly script?: string;
 }
 
-/** Result of executing a command. */
 export interface CommandResult {
   readonly command: string;
   readonly exitCode: number;
@@ -15,11 +26,23 @@ export interface CommandResult {
   readonly stderr: string;
 }
 
-/** Command registry — allowlist-based. */
+export interface CommandExecutionOptions {
+  readonly cwd?: string;
+  readonly timeoutMs?: number;
+  readonly environment?: Readonly<Record<string, string>>;
+  readonly passEnvironment?: readonly string[];
+  readonly signal?: AbortSignal;
+  readonly maxOutputBytes?: number;
+}
+
 export interface CommandRegistry {
   register(cmd: CommandEntry): void;
   isAllowed(name: string): boolean;
   get(name: string): CommandEntry | null;
   list(): CommandEntry[];
-  execute(name: string, args?: string[]): Promise<CommandResult>;
+  execute(
+    name: string,
+    args?: readonly string[],
+    options?: CommandExecutionOptions,
+  ): Promise<CommandResult>;
 }

@@ -1,28 +1,43 @@
 #!/usr/bin/env node
+// Rollback is implemented as an exact, verified backup restore. There are no down migrations.
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { isTempPath, loadStorageApi, resolveDbPath } from "./common.mjs";
 
-const dbPath = resolveDbPath();
-const allowRollback = process.env.MACHINE_ALLOW_DB_ROLLBACK === "1";
+const backupArgument = process.argv.find((argument) => !argument.startsWith("--"));
+const approved = process.argv.includes("--yes");
+const expectedSha256 = process.argv
+  .find((argument) => argument.startsWith("--sha256="))
+  ?.slice("--sha256=".length);
+const targetPath = resolveDbPath();
 
-if (!allowRollback) {
-  console.error("Rollback stopped: set MACHINE_ALLOW_DB_ROLLBACK=1 to acknowledge rollback intent.");
-  console.error(`Path: ${dbPath}`);
+if (!backupArgument) {
+  console.error(
+    "Usage: node tools/db/rollback.mjs <pre-upgrade-backup.sqlite> --yes [--sha256=<expected>]",
+  );
+  process.exit(2);
+}
+const backupPath = resolve(backupArgument);
+if (!existsSync(backupPath)) {
+  console.error(`Rollback backup not found: ${backupPath}`);
   process.exit(1);
 }
 
-if (!isTempPath(dbPath)) {
-  console.error("Rollback stopped: destructive rollback is only allowed for temp database paths.");
-  console.error(`Path: ${dbPath}`);
-  process.exit(1);
+const rollbackAuthorized =
+  isTempPath(targetPath) || process.env.MACHINE_ALLOW_DB_ROLLBACK === "1";
+if (!approved || !rollbackAuthorized) {
+  console.error("Rollback refused.");
+  console.error("Required: --yes and MACHINE_ALLOW_DB_ROLLBACK=1.");
+  console.error("The environment flag is waived only for an operating-system temporary database.");
+  process.exit(3);
 }
 
 const storage = await loadStorageApi();
-const conn = storage.createConnection({ path: dbPath });
-try {
-  const applied = storage.listApplied(conn);
-  console.log("Rollback: no reversible down migrations are registered.");
-  console.log(`Path: ${dbPath}`);
-  console.log(`Applied migrations: ${applied.length ? applied.join(", ") : "none"}`);
-} finally {
-  storage.closeConnection(conn);
-}
+const result = await storage.restoreBackup({
+  backupPath,
+  targetPath,
+  expectedSha256,
+  preservePrevious: true,
+});
+console.log(JSON.stringify(result, null, 2));
+console.log("Rollback restored and independently verified the exact pre-upgrade backup.");

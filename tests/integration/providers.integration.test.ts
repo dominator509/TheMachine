@@ -12,8 +12,12 @@ function jsonResponse(data: unknown, ok = true, status = 200): Response {
   return new Response(JSON.stringify(data), { status, statusText: ok ? "OK" : "Error" });
 }
 
+function headerValue(headers: HeadersInit | undefined, name: string): string | null {
+  return new Headers(headers).get(name);
+}
+
 describe("provider adapters", () => {
-  it("openai adapter posts chat completions through fetch", async () => {
+  it("openai adapter posts chat completions with bearer authentication", async () => {
     const calls: { url: string | URL; init?: RequestInit }[] = [];
     const fetchImpl: ProviderFetch = async (url, init) => {
       calls.push({ url, init });
@@ -29,7 +33,7 @@ describe("provider adapters", () => {
       "test-openai",
       "http://localhost:8080/v1",
       "gpt-4",
-      { apiKey: "sk-test", fetchImpl },
+      { apiKey: "sk-test-value", fetchImpl },
     );
     const res = await adapter.complete({
       model: "gpt-4",
@@ -39,6 +43,8 @@ describe("provider adapters", () => {
     expect(res.usage?.completionTokens).toBe(5);
     expect(String(calls[0]?.url)).toBe("http://localhost:8080/v1/chat/completions");
     expect(JSON.parse(String(calls[0]?.init?.body)).messages[0].content).toBe("Hello");
+    expect(headerValue(calls[0]?.init?.headers, "authorization")).toBe("Bearer sk-test-value");
+    expect(headerValue(calls[0]?.init?.headers, "x-api-key")).toBeNull();
   });
 
   it("openai adapter health uses fetch result", async () => {
@@ -54,11 +60,14 @@ describe("provider adapters", () => {
     expect(health.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("anthropic adapter posts messages through fetch", async () => {
+  it("anthropic adapter uses x-api-key rather than bearer authentication", async () => {
     const fetchImpl: ProviderFetch = async (url, init) => {
       expect(String(url)).toBe("http://localhost:8080/v1/messages");
       const body = JSON.parse(String(init?.body));
       expect(body.messages[0].content).toBe("Hi");
+      expect(headerValue(init?.headers, "x-api-key")).toBe("anthropic-test-key");
+      expect(headerValue(init?.headers, "authorization")).toBeNull();
+      expect(headerValue(init?.headers, "anthropic-version")).toBe("2023-06-01");
       return jsonResponse({
         id: "msg-1",
         model: "claude-3",
@@ -72,7 +81,7 @@ describe("provider adapters", () => {
       "test-anthropic",
       "http://localhost:8080",
       "claude-3",
-      { fetchImpl },
+      { apiKey: "anthropic-test-key", fetchImpl },
     );
     const res = await adapter.complete({
       model: "claude-3",
@@ -80,6 +89,24 @@ describe("provider adapters", () => {
     });
     expect(res.content).toBe("real anthropic response");
     expect(res.usage?.completionTokens).toBe(6);
+  });
+
+  it("anthropic health probes preserve provider-specific authentication", async () => {
+    const adapter = createAnthropicAdapter(
+      "anthropic-1" as EntityId,
+      "test-anthropic",
+      "http://localhost:8080",
+      "claude-3",
+      {
+        apiKey: "anthropic-health-key",
+        fetchImpl: async (_url, init) => {
+          expect(headerValue(init?.headers, "x-api-key")).toBe("anthropic-health-key");
+          expect(headerValue(init?.headers, "authorization")).toBeNull();
+          return new Response("ok");
+        },
+      },
+    );
+    expect((await adapter.health()).healthy).toBe(true);
   });
 
   it("local adapter uses OpenAI-compatible chat completions", async () => {

@@ -60,7 +60,13 @@ describe("recent", () => {
   it("should return newest events first", () => {
     const bus = createEventBus();
     bus.emit({ category: "info", severity: "info", subsystem: "a", code: "A", message: "first" });
-    bus.emit({ category: "error", severity: "error", subsystem: "b", code: "B", message: "second" });
+    bus.emit({
+      category: "error",
+      severity: "error",
+      subsystem: "b",
+      code: "B",
+      message: "second",
+    });
     const recent = bus.recent(2);
     expect(recent.length).toBe(2);
     expect(recent[0]!.message).toBe("second");
@@ -80,15 +86,33 @@ describe("filter", () => {
   it("should filter by category", () => {
     const bus = createEventBus();
     bus.emit({ category: "error", severity: "error", subsystem: "a", code: "E1", message: "err1" });
-    bus.emit({ category: "warning", severity: "warning", subsystem: "b", code: "W1", message: "warn1" });
-    bus.emit({ category: "error", severity: "critical", subsystem: "c", code: "E2", message: "err2" });
+    bus.emit({
+      category: "warning",
+      severity: "warning",
+      subsystem: "b",
+      code: "W1",
+      message: "warn1",
+    });
+    bus.emit({
+      category: "error",
+      severity: "critical",
+      subsystem: "c",
+      code: "E2",
+      message: "err2",
+    });
     const errors = bus.filter((e) => e.category === "error");
     expect(errors.length).toBe(2);
   });
 
   it("should filter by severity", () => {
     const bus = createEventBus();
-    bus.emit({ category: "error", severity: "critical", subsystem: "a", code: "C1", message: "crit" });
+    bus.emit({
+      category: "error",
+      severity: "critical",
+      subsystem: "a",
+      code: "C1",
+      message: "crit",
+    });
     bus.emit({ category: "error", severity: "error", subsystem: "b", code: "E1", message: "err" });
     const criticals = bus.filter((e) => e.severity === "critical");
     expect(criticals.length).toBe(1);
@@ -113,7 +137,13 @@ describe("countByCategory", () => {
     const bus = createEventBus();
     bus.emit({ category: "error", severity: "error", subsystem: "a", code: "E", message: "err" });
     bus.emit({ category: "error", severity: "error", subsystem: "b", code: "E2", message: "err2" });
-    bus.emit({ category: "warning", severity: "warning", subsystem: "c", code: "W", message: "warn" });
+    bus.emit({
+      category: "warning",
+      severity: "warning",
+      subsystem: "c",
+      code: "W",
+      message: "warn",
+    });
     const counts = bus.countByCategory();
     expect(counts.get("error")).toBe(2);
     expect(counts.get("warning")).toBe(1);

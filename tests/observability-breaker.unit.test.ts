@@ -5,11 +5,7 @@ import {
   createDriftDetector,
   createCircuitBreaker,
 } from "@the-machine/observability";
-import type {
-  EventBus,
-  DriftDetector,
-  CircuitBreaker,
-} from "@the-machine/observability";
+import type { EventBus, DriftDetector, CircuitBreaker } from "@the-machine/observability";
 
 // ─── Circuit Breaker Creation ──────────────────────────────────────────
 
@@ -51,7 +47,13 @@ describe("auto trip", () => {
     // Compute a baseline of clean windows
     bus.emit({ category: "info", severity: "info", subsystem: "a", code: "INF", message: "clean" });
     for (let i = 0; i < 6; i++) {
-      bus.emit({ category: "info", severity: "info", subsystem: "x", code: "INF", message: `msg${i}` });
+      bus.emit({
+        category: "info",
+        severity: "info",
+        subsystem: "x",
+        code: "INF",
+        message: `msg${i}`,
+      });
       detector.compute();
     }
     const state = breaker.evaluate(detector);
@@ -62,13 +64,31 @@ describe("auto trip", () => {
   it("should trip OPEN when drift anomaly detected", () => {
     // Build baseline of clean windows
     for (let w = 0; w < 5; w++) {
-      bus.emit({ category: "info", severity: "info", subsystem: "x", code: "INF", message: `info${w}` });
+      bus.emit({
+        category: "info",
+        severity: "info",
+        subsystem: "x",
+        code: "INF",
+        message: `info${w}`,
+      });
       detector.compute();
     }
 
     // Now spike errors in current window
-    bus.emit({ category: "error", severity: "critical", subsystem: "boom", code: "CRIT", message: "critical1" });
-    bus.emit({ category: "error", severity: "critical", subsystem: "boom", code: "CRIT", message: "critical2" });
+    bus.emit({
+      category: "error",
+      severity: "critical",
+      subsystem: "boom",
+      code: "CRIT",
+      message: "critical1",
+    });
+    bus.emit({
+      category: "error",
+      severity: "critical",
+      subsystem: "boom",
+      code: "CRIT",
+      message: "critical2",
+    });
     const snap = detector.compute();
     // Force anomalous for testing
     expect(snap.errorRate).toBeGreaterThan(0);
@@ -86,14 +106,32 @@ describe("auto trip", () => {
     // Manually force OPEN via anomaly: need error baseline + spike
     // Build error baseline (error rate ~0.5)
     for (let w = 0; w < 5; w++) {
-      bus.emit({ category: "error", severity: "error", subsystem: "x", code: "ERR", message: "err" });
-      bus.emit({ category: "info", severity: "info", subsystem: "x", code: "INF", message: "info" });
+      bus.emit({
+        category: "error",
+        severity: "error",
+        subsystem: "x",
+        code: "ERR",
+        message: "err",
+      });
+      bus.emit({
+        category: "info",
+        severity: "info",
+        subsystem: "x",
+        code: "INF",
+        message: "info",
+      });
       detector.compute();
     }
 
     // Spike: 10 errors vs 2 infos in window = 0.833 error rate
     for (let i = 0; i < 10; i++) {
-      bus.emit({ category: "error", severity: "critical", subsystem: "boom", code: "CRIT", message: `crit${i}` });
+      bus.emit({
+        category: "error",
+        severity: "critical",
+        subsystem: "boom",
+        code: "CRIT",
+        message: `crit${i}`,
+      });
     }
     bus.emit({ category: "info", severity: "info", subsystem: "x", code: "INF", message: "info" });
     bus.emit({ category: "info", severity: "info", subsystem: "x", code: "INF", message: "info" });

@@ -1,28 +1,41 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  ServiceStore,
+  acceptedReleaseDecision,
   createHealthHandler,
-  createWorkspaceHandler,
-  createRepoHandler,
-  createPlanHandler,
-  createRunHandler,
-  createValidationHandler,
-  createProviderHandler,
   createMCPHandler,
+  createPlanHandler,
   createPluginHandler,
   createProductionApprovalHandler,
+  createProviderHandler,
   createReadinessHandler,
-  acceptedReleaseDecision,
-  ServiceStore,
+  createRepoHandler,
+  createRunHandler,
+  createValidationHandler,
+  createWorkspaceHandler,
 } from "@the-machine/service";
-import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
-import type { ProductionApproval } from "@the-machine/service";
 import { createUI } from "@the-machine/ui-components";
+import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
+import type {
+  ProductionApproval,
+  ReadinessEvidenceSource,
+} from "@the-machine/service";
 
-function acceptedApproval(workspaceId: EntityId, detail = "Accepted for release."): ProductionApproval {
-  const decision = acceptedReleaseDecision(detail);
+const cleanup: string[] = [];
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  while (cleanup.length > 0) {
+    const target = cleanup.pop();
+    if (target) rmSync(target, { recursive: true, force: true });
+  }
+});
+
+function acceptedApproval(workspaceId: EntityId): ProductionApproval {
+  const decision = acceptedReleaseDecision("Accepted for isolated test release evidence.");
   return {
     workspaceId,
     providerConfiguration: decision,
@@ -30,311 +43,223 @@ function acceptedApproval(workspaceId: EntityId, detail = "Accepted for release.
     pluginSandbox: decision,
     sharedUIScope: decision,
     releaseDeployment: decision,
-    approvedBy: "Dominic",
-    approvedAt: "2026-06-24T00:00:00.000Z",
-    detail,
+    approvedBy: "test-operator",
+    approvedAt: new Date(0).toISOString(),
+    detail: "Fixture approval tied to executed evidence.",
   };
 }
 
-describe("service handlers integration", () => {
-  it("health handler returns ok", () => {
-    const handler = createHealthHandler("The Machine", "0.1.0", Date.now());
-    const res = handler.check({});
-    expect(res.status).toBe("ok");
-    expect(res.platform).toBe("The Machine");
-    expect(res.checks.core).toBe(true);
-  });
+function executedEvidence(candidateSha = "candidate"): ReadinessEvidenceSource {
+  return {
+    expectedCandidateSha: candidateSha,
+    get(subsystem) {
+      return {
+        subsystem,
+        candidateSha,
+        passed: true,
+        checkCount: 2,
+        evidenceDigest: `sha256:${subsystem}`,
+        completedAt: new Date(0).toISOString(),
+      };
+    },
+  };
+}
 
-  it("health handler accepts detail flag", () => {
-    const handler = createHealthHandler("Test", "1.0.0", Date.now());
-    const res = handler.check({ detail: true });
-    expect(res.status).toBe("ok");
-    expect(res.uptimeMs).toBeGreaterThanOrEqual(0);
-  });
+function planFixture(validationCommand = `node -e "console.log('ok')"`): {
+  directory: string;
+  database: string;
+  planPath: string;
+} {
+  const directory = mkdtempSync(join(tmpdir(), "machine-service-integration-"));
+  cleanup.push(directory);
+  const database = join(directory, "machine.sqlite");
+  const planPath = join(directory, "EP-test.md");
+  writeFileSync(
+    planPath,
+    `# EP-test: Fixture Plan
 
-  it("workspace handler returns pending for new path", () => {
-    const handler = createWorkspaceHandler();
-    const res = handler.get({ path: "/tmp/test-ws" });
-    expect(res.status).toBe("pending");
-    expect(res.path).toBe("/tmp/test-ws");
-  });
+### M0: First
 
-  it("workspace handler lists workspaces", () => {
-    const handler = createWorkspaceHandler();
-    handler.get({ path: "/ws/a" });
-    handler.get({ path: "/ws/b" });
-    const list = handler.list();
-    expect(list.workspaces).toHaveLength(2);
-  });
+- Goal: Exercise the explicitly gated legacy compatibility path.
+- Validation command: \`${validationCommand}\`
+- Expected result: ok
+- Recovery instruction: Stop on failure.
 
-  it("repo handler discovers profile", () => {
-    const handler = createRepoHandler();
-    const res = handler.discover({ workspaceId: "ws-1" as EntityId, rootPath: "/repo" });
-    expect(res.packageManager).toBe("pnpm");
-    expect(res.hasGit).toBe(true);
-  });
+- [ ] M0: First.
+`,
+    "utf-8",
+  );
+  return { directory, database, planPath };
+}
 
-  it("plan handler loads and retrieves", () => {
-    const handler = createPlanHandler();
-    const loaded = handler.load("/plans/ep-1.md");
-    expect(loaded.status).toBe("pending");
-    const got = handler.get({ planId: "/plans/ep-1.md" as EntityId });
-    expect(got).not.toBeNull();
-    expect(got!.id).toBe("/plans/ep-1.md");
-  });
-
-  it("plan handler returns null for unknown", () => {
-    const handler = createPlanHandler();
-    const got = handler.get({ planId: "nonexistent" as EntityId });
-    expect(got).toBeNull();
-  });
-
-  it("plan handler lists loaded plans", () => {
-    const handler = createPlanHandler();
-    handler.load("/plans/a.md");
-    handler.load("/plans/b.md");
-    const list = handler.list();
-    expect(list.plans).toHaveLength(2);
-  });
-
-  it("run handler starts and retrieves", () => {
-    const handler = createRunHandler();
-    const run = handler.start({ workspaceId: "ws-1" as EntityId, planId: "ep-1" as EntityId });
-    expect(run.status).toBe("active");
-    expect(run.execPlanId).toBe("ep-1");
-    const got = handler.get(run.id);
-    expect(got).not.toBeNull();
-  });
-
-  it("run handler lists runs", () => {
-    const handler = createRunHandler();
-    handler.start({ workspaceId: "ws-1" as EntityId, planId: "ep-1" as EntityId });
-    handler.start({ workspaceId: "ws-1" as EntityId, planId: "ep-2" as EntityId });
-    const list = handler.list();
-    expect(list.runs).toHaveLength(2);
-  });
-
-  it("validation handler records and lists", () => {
-    const handler = createValidationHandler();
-    const res = handler.record(
-      { runId: "run-1" as EntityId, command: "test" },
-      true,
-      0,
-      "all good",
-      "info",
-    );
-    expect(res.passed).toBe(true);
-    const list = handler.list("run-1" as EntityId);
-    expect(list.validations).toHaveLength(1);
-  });
-
-  it("provider handler registers and lists", () => {
-    const handler = createProviderHandler();
-    handler.register(
-      "p-1" as EntityId,
-      "local-llm",
-      "local" as ProviderTier,
-      "http://localhost:8080",
-      ["model-x"],
-      30000,
-    );
-    const list = handler.list();
-    expect(list.providers).toHaveLength(1);
-    expect(list.providers[0]?.name).toBe("local-llm");
-    const accepted = handler.acceptRelease(
-      "p-1" as EntityId,
-      acceptedReleaseDecision("Mocked local provider accepted for release."),
-    );
-    expect(accepted?.releaseDecision?.status).toBe("accepted");
-  });
-
-  it("MCP handler registers and lists", () => {
-    const handler = createMCPHandler();
-    handler.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", [
-      "read-file",
-      "write-file",
-    ]);
-    const list = handler.list();
-    expect(list.servers).toHaveLength(1);
-    expect(list.servers[0]?.toolCount).toBe(2);
-    const accepted = handler.acceptRelease(
-      "mcp-1" as EntityId,
-      acceptedReleaseDecision("Fixture stdio MCP accepted for release."),
-    );
-    expect(accepted?.releaseDecision?.status).toBe("accepted");
-  });
-
-  it("plugin handler registers and lists", () => {
-    const handler = createPluginHandler();
-    handler.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3);
-    const list = handler.list();
-    expect(list.plugins).toHaveLength(1);
-    expect(list.plugins[0]?.enabled).toBe(true);
-    const accepted = handler.acceptRelease(
-      "pl-1" as EntityId,
-      acceptedReleaseDecision("Trusted first-party plugin posture accepted for release."),
-    );
-    expect(accepted?.releaseDecision?.status).toBe("accepted");
-  });
-
-  it("production approval handler tracks missing and accepted release approval", () => {
-    const handler = createProductionApprovalHandler();
-
-    expect(handler.get().accepted).toBe(false);
-    expect(handler.get().missing).toContain("releaseDeployment");
-
-    const recorded = handler.record(acceptedApproval("ws-1" as EntityId));
-    expect(recorded.accepted).toBe(true);
-    expect(recorded.missing).toEqual([]);
-
-    const cleared = handler.clear();
-    expect(cleared.accepted).toBe(false);
-  });
-
-  it("readiness handler reports degraded when release decisions are missing", () => {
-    const handler = createReadinessHandler();
-    const res = handler.check({ workspaceId: "ws-1" as EntityId });
-    expect(res.overall).toBe("degraded");
-    expect(res.gates).toHaveLength(12);
-    expect(res.gates.find((gate) => gate.subsystem === "providers")?.status).toBe("pending");
-    expect(res.gates.find((gate) => gate.subsystem === "mcp")?.status).toBe("pending");
-    expect(res.gates.find((gate) => gate.subsystem === "plugin-sdk")?.status).toBe("pending");
-    expect(res.gates.find((gate) => gate.subsystem === "ui-components")?.status).toBe("pending");
-  });
-
-  it("readiness handler remains degraded when production approval is partial", () => {
-    const provider = createProviderHandler();
-    const mcp = createMCPHandler();
-    const plugin = createPluginHandler();
-    const approval = createProductionApprovalHandler();
-    const decision = acceptedReleaseDecision("Accepted for local release readiness.");
-
-    provider.register(
-      "p-1" as EntityId,
-      "local-llm",
-      "local" as ProviderTier,
-      "http://localhost:8080",
-      ["model-x"],
-      30000,
-      decision,
-    );
-    mcp.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", ["read-file"], decision);
-    plugin.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3, decision);
-    const ui = createUI({ status: "accepted", detail: "Shared UI registry accepted." });
-    approval.record({
-      ...acceptedApproval("ws-1" as EntityId),
-      releaseDeployment: { status: "pending", detail: "User approval not recorded." },
+describe("service handler integration", () => {
+  it("provides honest basic health, workspace, and repository discovery", () => {
+    const health = createHealthHandler("The Machine", "0.3.0-alpha.1", Date.now()).check({
+      detail: true,
     });
+    expect(health.status).toBe("ok");
+    expect(health.version).toBe("0.3.0-alpha.1");
 
-    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval });
-    const res = handler.check({ workspaceId: "ws-1" as EntityId });
+    const workspaces = createWorkspaceHandler();
+    expect(workspaces.get({ path: "/tmp/test-workspace" }).status).toBe("pending");
+    expect(workspaces.list().workspaces).toHaveLength(1);
 
-    expect(res.overall).toBe("degraded");
-    expect(res.gates.find((gate) => gate.subsystem === "service")?.status).toBe("pending");
+    const repository = createRepoHandler().discover({
+      workspaceId: "workspace" as EntityId,
+      rootPath: process.cwd(),
+    });
+    expect(repository.rootPath).toBe(process.cwd());
+    expect(repository.hasGit).toBe(true);
   });
 
-  it("readiness handler accepts intentionally unconfigured provider MCP and plugin surfaces", () => {
-    const approval = createProductionApprovalHandler();
-    approval.record(acceptedApproval("ws-1" as EntityId, "Operator accepted local-only release posture."));
+  it("keeps registered integrations unverified until execution evidence is recorded", () => {
+    const providers = createProviderHandler();
+    const provider = providers.register(
+      "provider" as EntityId,
+      "local-provider",
+      "local" as ProviderTier,
+      "http://127.0.0.1:8080",
+      ["model"],
+      30_000,
+    );
+    expect(provider.healthy).toBe(false);
+    expect(
+      providers.recordHealth("provider" as EntityId, true, "probe:200:model-list")?.healthy,
+    ).toBe(true);
 
-    const handler = createReadinessHandler({
+    const mcp = createMCPHandler();
+    const server = mcp.register(
+      "mcp" as EntityId,
+      "stdio-tools",
+      "stdio",
+      process.execPath,
+      ["read-file"],
+    );
+    expect(server.healthy).toBe(false);
+    expect(mcp.recordHealth("mcp" as EntityId, true, "initialize+tools/list")?.healthy).toBe(true);
+
+    const plugins = createPluginHandler();
+    const plugin = plugins.register(
+      "plugin" as EntityId,
+      "trusted-plugin",
+      "1.0.0" as SemVer,
+      "plugin.mjs",
+      0,
+    );
+    expect(plugin.enabled).toBe(false);
+    expect(
+      plugins.recordActivation("plugin" as EntityId, true, "trusted-subprocess hook passed")
+        ?.enabled,
+    ).toBe(true);
+  });
+
+  it("does not let operator acceptance substitute for missing execution evidence", () => {
+    const approval = createProductionApprovalHandler();
+    approval.record(acceptedApproval("workspace" as EntityId));
+    const readiness = createReadinessHandler({
       providers: createProviderHandler(),
       mcp: createMCPHandler(),
       plugins: createPluginHandler(),
       ui: createUI(),
       approval,
-    });
-    const res = handler.check({ workspaceId: "ws-1" as EntityId });
-
-    expect(res.overall).toBe("ready");
-    expect(res.gates.find((gate) => gate.subsystem === "providers")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "mcp")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "plugin-sdk")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "ui-components")?.status).toBe("completed");
+    }).check({ workspaceId: "workspace" as EntityId });
+    expect(readiness.overall).toBe("degraded");
+    expect(readiness.gates.every((gate) => gate.status !== "completed")).toBe(true);
   });
 
-  it("readiness handler reports ready when release decisions and production approval are accepted", () => {
-    const provider = createProviderHandler();
-    const mcp = createMCPHandler();
-    const plugin = createPluginHandler();
-    const approval = createProductionApprovalHandler();
-    const decision = acceptedReleaseDecision("Accepted for local release readiness.");
-
-    provider.register(
-      "p-1" as EntityId,
-      "local-llm",
+  it("reports ready only when candidate evidence, live probes, activation, and approvals agree", () => {
+    const decision = acceptedReleaseDecision("Accepted after fixture execution.");
+    const providers = createProviderHandler();
+    providers.register(
+      "provider" as EntityId,
+      "provider",
       "local" as ProviderTier,
-      "http://localhost:8080",
-      ["model-x"],
-      30000,
+      "http://127.0.0.1:8080",
+      ["model"],
+      30_000,
       decision,
     );
-    mcp.register("mcp-1" as EntityId, "fs-tools", "stdio", "/tmp/mcp.sock", ["read-file"], decision);
-    plugin.register("pl-1" as EntityId, "test-plugin", "1.0.0" as SemVer, "plugin.mjs", 3, decision);
-    const ui = createUI({ status: "accepted", detail: "Shared UI registry accepted." });
-    approval.record(acceptedApproval("ws-1" as EntityId, "Dominic approved release/deployment."));
+    providers.recordHealth("provider" as EntityId, true, "HTTP probe and completion fixture passed");
 
-    const handler = createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval });
-    const res = handler.check({ workspaceId: "ws-1" as EntityId });
+    const mcp = createMCPHandler();
+    mcp.register(
+      "mcp" as EntityId,
+      "mcp",
+      "stdio",
+      process.execPath,
+      ["read-file"],
+      decision,
+    );
+    mcp.recordHealth("mcp" as EntityId, true, "initialize and tools/call fixture passed");
 
-    expect(res.overall).toBe("ready");
-    expect(res.gates.find((gate) => gate.subsystem === "service")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "providers")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "mcp")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "plugin-sdk")?.status).toBe("completed");
-    expect(res.gates.find((gate) => gate.subsystem === "ui-components")?.status).toBe("completed");
-  });
-
-  it("readiness handler filters by subsystem", () => {
-    const handler = createReadinessHandler();
-    const res = handler.check({ workspaceId: "ws-1" as EntityId, subsystem: "core" });
-    expect(res.gates).toHaveLength(1);
-    expect(res.gates[0]?.subsystem).toBe("core");
-  });
-
-  it("loads a real ExecPlan into SQLite and runs the first milestone validation", () => {
-    const dir = mkdtempSync(join(tmpdir(), "machine-service-"));
-    const dbPath = join(dir, "machine.sqlite");
-    const planPath = join(dir, "EP-test.md");
-    writeFileSync(
-      planPath,
-      `# EP-test: Fixture Plan
-
-## 8. Milestones
-
-### M0: First
-
-- Goal: Prove the runner can execute a validation command.
-- Validation command: \`node -e "console.log('ok')"\`
-- Expected result: ok
-- Recovery instruction: Stop on failure.
-
-## 12. Progress
-
-- [ ] M0: First.
-`,
-      "utf-8",
+    const plugins = createPluginHandler();
+    plugins.register(
+      "plugin" as EntityId,
+      "plugin",
+      "1.0.0" as SemVer,
+      "plugin.mjs",
+      0,
+      decision,
+    );
+    plugins.recordActivation(
+      "plugin" as EntityId,
+      true,
+      "trusted-subprocess policy suite passed",
     );
 
-    const store = new ServiceStore(dbPath);
-    const planHandler = createPlanHandler(store);
-    const runHandler = createRunHandler(store);
-    const validationHandler = createValidationHandler(store);
+    const approval = createProductionApprovalHandler();
+    approval.record(acceptedApproval("workspace" as EntityId));
+    const readiness = createReadinessHandler({
+      providers,
+      mcp,
+      plugins,
+      ui: createUI(decision),
+      approval,
+      evidence: executedEvidence(),
+    }).check({ workspaceId: "workspace" as EntityId });
 
-    const plan = planHandler.load(planPath);
-    expect(plan.title).toBe("EP-test: Fixture Plan");
-    expect(plan.milestoneCount).toBe(1);
-    expect(plan.currentMilestone).toBe("M0");
+    expect(readiness.overall).toBe("ready");
+    expect(readiness.gates).toHaveLength(12);
+    expect(readiness.gates.every((gate) => gate.status === "completed")).toBe(true);
+  });
 
-    const run = runHandler.start({ workspaceId: "default" as EntityId, planId: plan.id });
-    expect(run.status).toBe("completed");
-    expect(run.commandCount).toBe(1);
-    expect(run.validationCount).toBe(1);
+  it("loads a Markdown compatibility plan but refuses to execute it by default", () => {
+    const fixture = planFixture();
+    const store = new ServiceStore(fixture.database);
+    try {
+      const plan = createPlanHandler(store).load(fixture.planPath);
+      const run = createRunHandler(store).start({
+        workspaceId: "default" as EntityId,
+        planId: plan.id,
+      });
+      expect(run.status).toBe("stopped");
+      expect(run.commandCount).toBe(0);
+      const validations = createValidationHandler(store).list(run.id).validations;
+      expect(validations).toHaveLength(1);
+      expect(validations[0]?.passed).toBe(false);
+      expect(validations[0]?.output).toContain("Legacy Markdown command execution is disabled");
+    } finally {
+      store.close();
+    }
+  });
 
-    const validations = validationHandler.list(run.id);
-    expect(validations.validations).toHaveLength(1);
-    expect(validations.validations[0]?.passed).toBe(true);
-    expect(planHandler.get({ planId: plan.id })?.completedMilestones).toBe(1);
-    store.close();
+  it("executes the legacy path only under the explicit compatibility flag", () => {
+    vi.stubEnv("MACHINE_ALLOW_LEGACY_PLAN_EXECUTION", "1");
+    const fixture = planFixture();
+    const store = new ServiceStore(fixture.database);
+    try {
+      const planHandler = createPlanHandler(store);
+      const plan = planHandler.load(fixture.planPath);
+      const run = createRunHandler(store).start({
+        workspaceId: "default" as EntityId,
+        planId: plan.id,
+      });
+      expect(run.status).toBe("completed");
+      expect(run.commandCount).toBe(1);
+      expect(createValidationHandler(store).list(run.id).validations[0]?.passed).toBe(true);
+      expect(planHandler.get({ planId: plan.id })?.completedMilestones).toBe(1);
+    } finally {
+      store.close();
+    }
   });
 });
