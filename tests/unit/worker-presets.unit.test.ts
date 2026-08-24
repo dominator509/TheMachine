@@ -32,7 +32,7 @@ describe("first-class worker presets", () => {
     expect(ids).toEqual(expect.arrayContaining(["codex", "claude-code", "aider", "openhands"]));
   });
 
-  it("exposes an auditable safety and installation descriptor for every preset", () => {
+  it("exposes an auditable safety and invocation descriptor for every preset", () => {
     const descriptors = createBuiltinWorkers().map(describeWorker);
     expect(descriptors.map((descriptor) => descriptor.id)).toEqual([
       "codex",
@@ -46,17 +46,56 @@ describe("first-class worker presets", () => {
       expect(descriptor.documentationUrl).toMatch(/^https:\/\//);
       expect(descriptor.safetyNotes.length).toBeGreaterThan(0);
       expect(descriptor.supportedPlatforms.length).toBeGreaterThan(0);
+      expect(descriptor.invocationTemplate.length).toBeGreaterThan(0);
     }
   });
 
-  it("probes configured executables without a shell", async () => {
+  it("uses the current Codex exec contract and removes fabricated flags", () => {
+    const descriptor = createBuiltinWorkers().map(describeWorker).find((item) => item.id === "codex");
+    expect(descriptor?.invocationTemplate).toEqual([
+      "exec",
+      "--json",
+      "--color",
+      "never",
+      "--ephemeral",
+      "--skip-git-repo-check",
+      "--full-auto",
+      "-C",
+      "{workspace}",
+      "{prompt}",
+    ]);
+    expect(descriptor?.invocationTemplate).not.toContain("--ignore-rules");
+    expect(descriptor?.invocationTemplate).not.toContain("--approve-for-me");
+    expect(descriptor?.invocationTemplate).not.toContain("--cd");
+  });
+
+  it("uses documented scripting flags for Aider and OpenHands", () => {
+    const descriptors = createBuiltinWorkers().map(describeWorker);
+    const aider = descriptors.find((item) => item.id === "aider");
+    expect(aider?.invocationTemplate).toContain("--yes");
+    expect(aider?.invocationTemplate).not.toContain("--yes-always");
+    expect(aider?.invocationTemplate).not.toContain("--disable-playwright");
+    expect(aider?.invocationTemplate).not.toContain("--skip-sanity-check-repo");
+
+    const openhands = descriptors.find((item) => item.id === "openhands");
+    expect(openhands?.invocationTemplate).toEqual([
+      "--headless",
+      "--json",
+      "--override-with-envs",
+      "--file",
+      "{promptFile}",
+    ]);
+  });
+
+  it("does not mistake an unrelated executable with a version flag for an installed worker", async () => {
     for (const name of executableVariables) process.env[name] = process.execPath;
     const probes = await probeWorkers(createBuiltinWorkers());
     expect(probes).toHaveLength(4);
     for (const probe of probes) {
-      expect(probe.available).toBe(true);
+      expect(probe.available).toBe(false);
       expect(probe.executable).toBe(process.execPath);
       expect(probe.version).toMatch(/^v?\d+\./);
+      expect(probe.message).toContain("unexpected identity");
     }
   });
 

@@ -15,6 +15,8 @@ export interface PluginResponse {
   readonly entryPoint: string;
   readonly permissionCount: number;
   readonly enabled: boolean;
+  readonly activationCheckedAt?: string;
+  readonly activationEvidence?: string;
   readonly releaseDecision?: ReleaseDecision;
 }
 

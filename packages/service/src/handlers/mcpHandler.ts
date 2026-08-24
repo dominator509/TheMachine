@@ -13,6 +13,12 @@ export interface MCPHandler {
     tools: string[],
     releaseDecision?: ReleaseDecision,
   ): MCPResponse;
+  recordHealth(
+    mcpId: EntityId,
+    healthy: boolean,
+    evidence: string,
+    checkedAt?: string,
+  ): MCPResponse | null;
   acceptRelease(mcpId: EntityId, decision: ReleaseDecision): MCPResponse | null;
 }
 
@@ -45,11 +51,25 @@ export function createMCPHandler(): MCPHandler {
         endpoint,
         tools,
         toolCount: tools.length,
-        healthy: true,
+        healthy: false,
         ...(releaseDecision ? { releaseDecision } : {}),
       };
       servers.set(id, server);
       return server;
+    },
+
+    recordHealth(mcpId, healthy, evidence, checkedAt): MCPResponse | null {
+      const server = servers.get(mcpId);
+      if (!server) return null;
+      if (evidence.trim().length === 0) throw new Error("MCP health evidence must not be empty.");
+      const updated: MCPResponse = {
+        ...server,
+        healthy,
+        healthCheckedAt: checkedAt ?? new Date().toISOString(),
+        healthEvidence: evidence,
+      };
+      servers.set(mcpId, updated);
+      return updated;
     },
 
     acceptRelease(mcpId: EntityId, decision: ReleaseDecision): MCPResponse | null {

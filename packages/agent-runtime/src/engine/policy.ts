@@ -109,9 +109,33 @@ export function evaluatePatchPolicy(input: {
 }): PolicyDecision {
   const planPolicy = input.planPolicy ?? {};
   const changedFiles = Array.from(new Set(input.patch.changedFiles.map(normalizePath))).sort();
+  const ignoredFiles = Array.from(
+    new Set((input.patch.ignoredFiles ?? []).map(normalizePath)),
+  ).sort();
+  const unsafeSymlinks = Array.from(
+    new Set((input.patch.unsafeSymlinks ?? []).map(normalizePath)),
+  ).sort();
   const violations: PolicyViolation[] = changedFiles.flatMap((filePath) =>
     pathViolation(filePath, planPolicy, input.task),
   );
+
+  for (const ignoredFile of ignoredFiles) {
+    violations.push({
+      code: "PATH_DENIED",
+      message:
+        `Worker created an ignored path that would evade the staged patch and could influence ` +
+        `validation or a later attempt: ${ignoredFile}`,
+      path: ignoredFile,
+    });
+  }
+  for (const symlink of unsafeSymlinks) {
+    violations.push({
+      code: "PATH_DENIED",
+      message: `Changed symbolic link resolves outside the run worktree or into protected state: ${symlink}`,
+      path: symlink,
+    });
+  }
+
   const maxChangedFiles = planPolicy.maxChangedFiles ?? 100;
   const maxPatchBytes = planPolicy.maxPatchBytes ?? 1024 * 1024;
 

@@ -18,9 +18,21 @@ export interface GuiServerConfig {
   readonly builderPath: string;
   readonly maxBodyBytes: number;
   readonly allowRemote: boolean;
+  /** Optional externally generated capabilities for a supervised launch. */
+  readonly viewerToken?: string;
+  readonly eventToken?: string;
 }
 
-const DEFAULT_CONFIG: GuiServerConfig = {
+export interface GuiServerAccess {
+  readonly dashboardUrl: string;
+  readonly builderUrl: string;
+  readonly eventWebhookUrl: string;
+  readonly eventToken: string;
+}
+
+type ResolvedGuiServerConfig = Omit<GuiServerConfig, "viewerToken" | "eventToken">;
+
+const DEFAULT_CONFIG: ResolvedGuiServerConfig = {
   port: 3000,
   host: "127.0.0.1",
   themeAssetsDir: path.resolve(__dirname, "../../src/gui/themes"),
@@ -37,8 +49,11 @@ interface SseClient {
 
 interface ActiveServer {
   readonly server: http.Server;
-  readonly config: GuiServerConfig;
+  readonly config: ResolvedGuiServerConfig;
   readonly sessionToken: string;
+  readonly viewerToken: string;
+  readonly eventToken: string;
+  readonly access: GuiServerAccess;
 }
 
 let activeServer: ActiveServer | null = null;
@@ -95,10 +110,7 @@ function validTheme(value: unknown): value is ThemeManifest {
   if (!isRecord(value["chrome"]) || !isRecord(value["stations"]) || !isRecord(value["sprites"])) {
     return false;
   }
-  if (Object.keys(value["stations"]).length > 200 || Object.keys(value["sprites"]).length > 500) {
-    return false;
-  }
-  return true;
+  return Object.keys(value["stations"]).length <= 200 && Object.keys(value["sprites"]).length <= 500;
 }
 
 function broadcastToSseClients(data: string): void {
@@ -118,7 +130,7 @@ function hostWithoutPort(hostHeader: string): string {
   return hostHeader.split(":")[0] ?? hostHeader;
 }
 
-function requestHostAllowed(req: http.IncomingMessage, config: GuiServerConfig): boolean {
+function requestHostAllowed(req: http.IncomingMessage, config: ResolvedGuiServerConfig): boolean {
   const hostHeader = req.headers.host;
   if (!hostHeader) return false;
   const host = hostWithoutPort(hostHeader).toLowerCase();
@@ -130,9 +142,8 @@ function remoteIsLoopback(req: http.IncomingMessage): boolean {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
-function originAllowed(req: http.IncomingMessage, config: GuiServerConfig): boolean {
-  const fetchSite = req.headers["sec-fetch-site"];
-  if (fetchSite === "cross-site") return false;
+function originAllowed(req: http.IncomingMessage, config: ResolvedGuiServerConfig): boolean {
+  if (req.headers["sec-fetch-site"] === "cross-site") return false;
   const origin = req.headers.origin;
   if (!origin) return remoteIsLoopback(req);
   try {
@@ -143,9 +154,7 @@ function originAllowed(req: http.IncomingMessage, config: GuiServerConfig): bool
     return (
       parsed.protocol === "http:" &&
       actualPort === expectedPort &&
-      (config.allowRemote
-        ? originHost === config.host.toLowerCase()
-        : LOOPBACK_HOSTS.has(originHost))
+      (config.allowRemote ? originHost === config.host.toLowerCase() : LOOPBACK_HOSTS.has(originHost))
     );
   } catch {
     return false;
@@ -173,6 +182,12 @@ function safeTokenEqual(left: string | undefined, right: string): boolean {
 
 function sessionAllowed(req: http.IncomingMessage, token: string): boolean {
   return safeTokenEqual(parseCookies(req)[SESSION_COOKIE], token);
+}
+
+function bearerAllowed(req: http.IncomingMessage, token: string): boolean {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith("Bearer ")) return false;
+  return safeTokenEqual(authorization.slice("Bearer ".length), token);
 }
 
 function setSecurityHeaders(res: http.ServerResponse): void {
@@ -263,7 +278,7 @@ function handleTheme(res: http.ServerResponse, name: string): void {
   }
 }
 
-function handleSaveTheme(res: http.ServerResponse, body: string, config: GuiServerConfig): void {
+function handleSaveTheme(res: http.ServerResponse, body: string, config: ResolvedGuiServerConfig): void {
   try {
     const parsed: unknown = JSON.parse(body);
     if (!validTheme(parsed)) {
@@ -292,7 +307,7 @@ function handleSaveTheme(res: http.ServerResponse, body: string, config: GuiServ
   }
 }
 
-function allowedStaticPath(filePath: string, config: GuiServerConfig): boolean {
+function allowedStaticPath(filePath: string, config: ResolvedGuiServerConfig): boolean {
   const resolved = path.resolve(filePath);
   const roots = [
     path.resolve(config.themeAssetsDir),
@@ -301,24 +316,21 @@ function allowedStaticPath(filePath: string, config: GuiServerConfig): boolean {
   ];
   return roots.some((root) => {
     const relativePath = path.relative(root, resolved);
-    return (
-      relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
-    );
+    return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
   });
 }
 
 function serveStatic(
   res: http.ServerResponse,
-  config: GuiServerConfig,
+  config: ResolvedGuiServerConfig,
   urlPath: string,
   sessionToken: string,
+  establishSession: boolean,
 ): void {
   let filePath: string;
-  if (urlPath === "/" || urlPath === "/index.html") {
-    filePath = config.dashboardPath;
-  } else if (urlPath === "/builder") {
-    filePath = config.builderPath;
-  } else if (urlPath.startsWith("/assets/")) {
+  if (urlPath === "/" || urlPath === "/index.html") filePath = config.dashboardPath;
+  else if (urlPath === "/builder") filePath = config.builderPath;
+  else if (urlPath.startsWith("/assets/")) {
     const assetPath = urlPath.slice("/assets/".length);
     if (assetPath.includes("\0") || assetPath.split("/").includes("..")) {
       forbidden(res, "Invalid asset path.");
@@ -338,11 +350,14 @@ function serveStatic(
   try {
     const content = fs.readFileSync(filePath);
     const extension = path.extname(filePath).toLowerCase();
-    res.writeHead(200, {
+    const headers: Record<string, string> = {
       "Content-Type": MIME_TYPES[extension] ?? "application/octet-stream",
-      "Set-Cookie": `${SESSION_COOKIE}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`,
       "Cache-Control": "no-store",
-    });
+    };
+    if (establishSession) {
+      headers["Set-Cookie"] = `${SESSION_COOKIE}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`;
+    }
+    res.writeHead(200, headers);
     res.end(content);
   } catch {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -353,9 +368,9 @@ function serveStatic(
 async function handleRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  config: GuiServerConfig,
-  sessionToken: string,
+  active: ActiveServer,
 ): Promise<void> {
+  const { config, sessionToken, viewerToken, eventToken } = active;
   setSecurityHeaders(res);
   if (!requestHostAllowed(req, config)) {
     forbidden(res, "Host is not allowed.");
@@ -370,23 +385,25 @@ async function handleRequest(
     return;
   }
 
-  if (method === "POST") {
-    if (!originAllowed(req, config)) {
-      forbidden(res, "Cross-origin write request denied.");
-      return;
-    }
-    const isLoopbackPipelineEvent =
-      url.pathname === "/api/pipeline-event" && !req.headers.origin && remoteIsLoopback(req);
-    if (!isLoopbackPipelineEvent && !sessionAllowed(req, sessionToken)) {
-      forbidden(res, "Missing or invalid local session.");
-      return;
-    }
+  if (method === "POST" && !originAllowed(req, config)) {
+    forbidden(res, "Cross-origin write request denied.");
+    return;
   }
 
   if (method === "POST" && url.pathname === "/api/pipeline-event") {
+    if (!bearerAllowed(req, eventToken)) {
+      forbidden(res, "Missing or invalid event-producer capability.");
+      return;
+    }
     handlePipelineEvent(res, await readBody(req, config.maxBodyBytes));
     return;
   }
+
+  if (url.pathname.startsWith("/api/") && !sessionAllowed(req, sessionToken)) {
+    forbidden(res, "Missing or invalid viewer session.");
+    return;
+  }
+
   if (method === "GET" && url.pathname === "/api/pipeline-stream") {
     handleSseStream(req, res);
     return;
@@ -408,12 +425,35 @@ async function handleRequest(
     res.end("Method not allowed");
     return;
   }
-  serveStatic(res, config, url.pathname, sessionToken);
+
+  const hasSession = sessionAllowed(req, sessionToken);
+  const hasBootstrapCapability = safeTokenEqual(url.searchParams.get("access") ?? undefined, viewerToken);
+  const canBootstrap =
+    (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/builder") &&
+    hasBootstrapCapability;
+  if (!hasSession && !canBootstrap) {
+    forbidden(res, "A viewer launch capability is required.");
+    return;
+  }
+  serveStatic(res, config, url.pathname, sessionToken, canBootstrap);
+}
+
+function createAccess(config: ResolvedGuiServerConfig, viewerToken: string, eventToken: string): GuiServerAccess {
+  const base = `http://${config.host}:${String(config.port)}`;
+  return {
+    dashboardUrl: `${base}/?access=${encodeURIComponent(viewerToken)}`,
+    builderUrl: `${base}/builder?access=${encodeURIComponent(viewerToken)}`,
+    eventWebhookUrl: `${base}/api/pipeline-event`,
+    eventToken,
+  };
 }
 
 export function startGuiServer(config?: Partial<GuiServerConfig>): http.Server {
   if (activeServer) return activeServer.server;
-  const merged: GuiServerConfig = { ...DEFAULT_CONFIG, ...config };
+  const merged: ResolvedGuiServerConfig = {
+    ...DEFAULT_CONFIG,
+    ...config,
+  };
   if (!merged.allowRemote && !LOOPBACK_HOSTS.has(merged.host.toLowerCase())) {
     throw new Error("The GUI server is loopback-only unless allowRemote is explicitly enabled.");
   }
@@ -421,18 +461,26 @@ export function startGuiServer(config?: Partial<GuiServerConfig>): http.Server {
     throw new Error(`Invalid GUI port: ${String(merged.port)}`);
   }
   const sessionToken = randomBytes(32).toString("base64url");
+  const viewerToken = config?.viewerToken ?? randomBytes(32).toString("base64url");
+  const eventToken = config?.eventToken ?? randomBytes(32).toString("base64url");
+  const access = createAccess(merged, viewerToken, eventToken);
   const server = http.createServer((req, res) => {
-    handleRequest(req, res, merged, sessionToken).catch((error: unknown) => {
+    const active = activeServer;
+    if (!active) {
+      json(res, 503, { ok: false, error: "GUI server is stopping." });
+      return;
+    }
+    handleRequest(req, res, active).catch((error: unknown) => {
       console.error("[pipeline-gui] Unhandled error:", error);
       if (!res.headersSent) json(res, 500, { ok: false, error: "Internal server error." });
       else res.end();
     });
   });
-  activeServer = { server, config: merged, sessionToken };
+  activeServer = { server, config: merged, sessionToken, viewerToken, eventToken, access };
   server.listen(merged.port, merged.host, () => {
     console.log(`[pipeline-gui] Running at http://${merged.host}:${String(merged.port)}`);
-    console.log(`[pipeline-gui] Dashboard: http://${merged.host}:${String(merged.port)}/`);
-    console.log(`[pipeline-gui] Builder: http://${merged.host}:${String(merged.port)}/builder`);
+    console.log(`[pipeline-gui] Dashboard launch URL: ${access.dashboardUrl}`);
+    console.log(`[pipeline-gui] Builder launch URL: ${access.builderUrl}`);
   });
   return server;
 }
@@ -455,6 +503,10 @@ export function getSseClientCount(): number {
   return sseClients.length;
 }
 
-export function getGuiServerConfig(): GuiServerConfig | null {
+export function getGuiServerConfig(): ResolvedGuiServerConfig | null {
   return activeServer?.config ?? null;
+}
+
+export function getGuiServerAccess(): GuiServerAccess | null {
+  return activeServer ? { ...activeServer.access } : null;
 }

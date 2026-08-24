@@ -1,176 +1,207 @@
 #!/usr/bin/env node
-// Production readiness check — evaluate all 12 subsystems.
-// Each subsystem gets a pass/fail check with a summary table at the end.
-// Subsystems: core, storage, service, providers, mcp, security, observability,
-//             agent-runtime, plugin-sdk, cli, desktop, ui-components.
+// Evidence-producing production-readiness gate runner.
+// A source directory or registration is never counted as proof of functionality.
 
-import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const PROFILE = process.env.MACHINE_READINESS_PROFILE || "ci";
+const OUTPUT_ROOT = resolve(
+  process.env.MACHINE_READINESS_OUTPUT || join(ROOT, "artifacts", "readiness"),
+);
+const LOG_ROOT = join(OUTPUT_ROOT, "gates");
+const PNPM = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const MAX_OUTPUT = 32 * 1024 * 1024;
 
-function checkSubsystem(name, pkgDir) {
-  const pkgPath = join(ROOT, pkgDir, "package.json");
-  if (!existsSync(pkgPath)) {
-    return { name, status: "FAIL", detail: "package.json not found" };
-  }
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-    // Check that the package has a build output or src dir
-    const hasSrc = existsSync(join(ROOT, pkgDir, "src"));
-    const hasDist = existsSync(join(ROOT, pkgDir, "dist"));
-    const detail = [];
-    if (hasSrc) detail.push("src");
-    if (hasDist) detail.push("dist");
-    return { name, status: hasSrc ? "PASS" : "FAIL", detail: detail.join(", ") || "no source" };
-  } catch {
-    return { name, status: "FAIL", detail: "package.json parse error" };
-  }
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
-function checkTool(name, toolPath) {
-  const fullPath = join(ROOT, toolPath);
-  if (!existsSync(fullPath)) {
-    return { name, status: "FAIL", detail: "file not found" };
+function gitSha() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: ROOT,
+    encoding: "utf-8",
+    shell: false,
+  });
+  if (result.status !== 0 || !result.stdout.trim()) {
+    throw new Error(`Unable to pin candidate SHA: ${result.stderr || result.error?.message || "unknown"}`);
   }
-  return { name, status: "PASS", detail: "exists" };
+  return result.stdout.trim();
 }
 
-function checkScript(name, scriptPath) {
-  const fullPath = join(ROOT, scriptPath);
-  if (!existsSync(fullPath)) {
-    return { name, status: "FAIL", detail: "not found" };
-  }
-  // Check it's executable or a Node.js script
-  const content = readFileSync(fullPath, "utf-8");
-  const isExec = content.startsWith("#!");
-  return { name, status: "PASS", detail: isExec ? "executable" : "script exists" };
+function runGate(definition) {
+  const startedAt = new Date().toISOString();
+  const started = Date.now();
+  const result = spawnSync(definition.executable, definition.args, {
+    cwd: definition.cwd || ROOT,
+    env: process.env,
+    encoding: "utf-8",
+    shell: false,
+    windowsHide: true,
+    maxBuffer: MAX_OUTPUT,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const stdout = result.stdout || "";
+  const stderr = `${result.stderr || ""}${result.error ? `\n${result.error.message}` : ""}`;
+  const exitCode = result.status ?? 1;
+  const completedAt = new Date().toISOString();
+  const log = [
+    `$ ${definition.executable} ${definition.args.join(" ")}`,
+    `started_at=${startedAt}`,
+    `completed_at=${completedAt}`,
+    `exit_code=${String(exitCode)}`,
+    "",
+    "--- stdout ---",
+    stdout,
+    "--- stderr ---",
+    stderr,
+  ].join("\n");
+  const logPath = join(LOG_ROOT, `${definition.id}.log`);
+  writeFileSync(logPath, log, { encoding: "utf-8", mode: 0o600 });
+  return {
+    id: definition.id,
+    command: [definition.executable, ...definition.args],
+    subsystems: definition.subsystems,
+    blocking: definition.blocking !== false,
+    passed: exitCode === 0,
+    exitCode,
+    startedAt,
+    completedAt,
+    durationMs: Date.now() - started,
+    stdoutSha256: sha256(stdout),
+    stderrSha256: sha256(stderr),
+    logPath: logPath.slice(ROOT.length + 1).replaceAll("\\", "/"),
+    logSha256: sha256(log),
+  };
 }
 
-function checkDoc(name) {
-  const path = join(ROOT, name);
-  if (!existsSync(path)) {
-    return { name, status: "FAIL", detail: "not found" };
-  }
-  return { name, status: "PASS", detail: "exists" };
+function fileGate(id, filePath, subsystems) {
+  const absolutePath = resolve(ROOT, filePath);
+  const passed = existsSync(absolutePath);
+  const contents = passed ? readFileSync(absolutePath) : Buffer.alloc(0);
+  const now = new Date().toISOString();
+  return {
+    id,
+    command: ["verify-file", filePath],
+    subsystems,
+    blocking: true,
+    passed,
+    exitCode: passed ? 0 : 1,
+    startedAt: now,
+    completedAt: now,
+    durationMs: 0,
+    stdoutSha256: sha256(contents),
+    stderrSha256: sha256(""),
+    logPath: null,
+    logSha256: sha256(contents),
+  };
 }
 
-function runCheck(name, cmd, cwd) {
-  try {
-    execSync(cmd, { stdio: "pipe", cwd: cwd || ROOT });
-    return { name, status: "PASS", detail: "ok" };
-  } catch (e) {
-    const stderr = e.stderr ? e.stderr.toString().trim().slice(0, 80) : "exit code != 0";
-    return { name, status: "FAIL", detail: stderr };
-  }
-}
-
-const results = [];
-
-console.log("=== The Machine — Production Readiness Check ===\n");
-console.log("--- Package Subsystems ---");
-
-// 12 subsystems
-const subsystems = [
-  { name: "core", dir: "packages/core" },
-  { name: "storage", dir: "packages/storage" },
-  { name: "service", dir: "packages/service" },
-  { name: "providers", dir: "packages/providers" },
-  { name: "mcp", dir: "packages/mcp" },
-  { name: "security", dir: "packages/security" },
-  { name: "observability", dir: "packages/observability" },
-  { name: "agent-runtime", dir: "packages/agent-runtime" },
-  { name: "plugin-sdk", dir: "packages/plugin-sdk" },
-  { name: "cli", dir: "apps/cli" },
-  { name: "desktop", dir: "apps/desktop" },
-  { name: "ui-components", dir: "packages/ui-components" },
+const definitions = [
+  { id: "lint", executable: PNPM, args: ["lint"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
+  { id: "format", executable: PNPM, args: ["format:check"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
+  { id: "typecheck", executable: PNPM, args: ["typecheck"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
+  { id: "unit", executable: PNPM, args: ["test:unit"], subsystems: ["core", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
+  { id: "integration", executable: PNPM, args: ["test:integration"], subsystems: ["storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli"] },
+  { id: "build", executable: PNPM, args: ["build"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
+  { id: "e2e", executable: PNPM, args: ["test:e2e"], subsystems: ["service", "agent-runtime", "cli", "ui-components"] },
+  { id: "benchmark-smoke", executable: PNPM, args: ["benchmark:smoke"], subsystems: ["agent-runtime", "cli"] },
+  { id: "secret-scan", executable: PNPM, args: ["security:check"], subsystems: ["security"] },
+  { id: "dependency-audit", executable: PNPM, args: ["audit"], subsystems: ["security"] },
+  { id: "release-build", executable: PNPM, args: ["build:release"], subsystems: ["cli"] },
+  { id: "smoke", executable: PNPM, args: ["smoke"], subsystems: ["service", "cli"] },
 ];
 
-for (const sub of subsystems) {
-  const r = checkSubsystem(sub.name, sub.dir);
-  results.push(r);
-  console.log(`  ${r.status === "PASS" ? "✓" : "✗"} ${r.name} — ${r.detail}`);
+rmSync(OUTPUT_ROOT, { recursive: true, force: true });
+mkdirSync(LOG_ROOT, { recursive: true, mode: 0o700 });
+const candidateSha = gitSha();
+const generatedAt = new Date().toISOString();
+const gates = definitions.map(runGate);
+gates.push(fileGate("cargo-lock", "apps/desktop/src-tauri/Cargo.lock", ["desktop"]));
+
+if (PROFILE === "release") {
+  const nativeManifest =
+    process.env.MACHINE_NATIVE_ARTIFACT_MANIFEST || "release/native-artifacts.json";
+  gates.push(fileGate("native-artifact-manifest", nativeManifest, ["desktop"]));
+  gates.push(fileGate("release-manifest", "release/release-manifest.json", ["cli", "desktop"]));
 }
 
-console.log("\n--- Script Checks ---");
-
-const scriptChecks = [
-  "scripts/preflight.sh",
-  "scripts/build.sh",
-  "scripts/test-unit.sh",
-  "scripts/security-check.sh",
-  "scripts/lint.sh",
-  "scripts/typecheck.sh",
-  "scripts/test-integration.sh",
-  "scripts/test-e2e.sh",
-  "scripts/format-check.sh",
-  "scripts/smoke-test.sh",
+const subsystemNames = [
+  "core",
+  "storage",
+  "service",
+  "providers",
+  "mcp",
+  "security",
+  "observability",
+  "agent-runtime",
+  "plugin-sdk",
+  "cli",
+  "desktop",
+  "ui-components",
 ];
-
-for (const s of scriptChecks) {
-  const r = checkScript(s.replace("scripts/", ""), s);
-  results.push({ ...r, name: s.replace("scripts/", "") });
-  console.log(`  ${r.status === "PASS" ? "✓" : "✗"} ${s} — ${r.detail}`);
+const subsystems = {};
+for (const subsystem of subsystemNames) {
+  const relevant = gates.filter((gate) => gate.subsystems.includes(subsystem));
+  const passed = relevant.length > 0 && relevant.every((gate) => gate.passed);
+  const canonical = JSON.stringify(
+    relevant.map((gate) => ({ id: gate.id, passed: gate.passed, logSha256: gate.logSha256 })),
+  );
+  subsystems[subsystem] = {
+    subsystem,
+    candidateSha,
+    passed,
+    checkCount: relevant.length,
+    evidenceDigest: `sha256:${sha256(canonical)}`,
+    completedAt: relevant.at(-1)?.completedAt || generatedAt,
+    gates: relevant.map((gate) => gate.id),
+  };
 }
 
-console.log("\n--- Tools ---");
+const blockingFailures = gates.filter((gate) => gate.blocking && !gate.passed);
+const evidence = {
+  schemaVersion: 1,
+  profile: PROFILE,
+  candidateSha,
+  generatedAt,
+  toolchain: {
+    node: process.version,
+    platform: process.platform,
+    arch: process.arch,
+  },
+  gates,
+  subsystems,
+  overall: blockingFailures.length === 0 ? "ready" : "not_ready",
+};
+const evidencePath = join(OUTPUT_ROOT, "READINESS_EVIDENCE.json");
+writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, {
+  encoding: "utf-8",
+  mode: 0o600,
+});
+writeFileSync(
+  join(OUTPUT_ROOT, "READINESS_EVIDENCE.sha256"),
+  `${sha256(readFileSync(evidencePath))}  READINESS_EVIDENCE.json\n`,
+  { encoding: "utf-8", mode: 0o600 },
+);
 
-const toolChecks = [
-  { name: "db/setup.mjs", path: "tools/db/setup.mjs" },
-  { name: "db/migrate.mjs", path: "tools/db/migrate.mjs" },
-  { name: "db/rollback.mjs", path: "tools/db/rollback.mjs" },
-  { name: "security/check-secrets.mjs", path: "tools/security/check-secrets.mjs" },
-  { name: "smoke/smoke-test.mjs", path: "tools/smoke/smoke-test.mjs" },
-  { name: "readiness checker", path: "tools/readiness/production-readiness-check.mjs" },
-  { name: "release/build-release.mjs", path: "tools/release/build-release.mjs" },
-];
-
-for (const t of toolChecks) {
-  const r = checkTool(t.name, t.path);
-  results.push({ ...r, name: t.name });
-  console.log(`  ${r.status === "PASS" ? "✓" : "✗"} tools/${t.name} — ${r.detail}`);
+console.log(`Candidate: ${candidateSha}`);
+console.log(`Profile: ${PROFILE}`);
+for (const gate of gates) {
+  console.log(`${gate.passed ? "PASS" : "FAIL"}: ${gate.id} (${String(gate.exitCode)})`);
 }
-
-console.log("\n--- Release Docs ---");
-
-const docsChecks = ["DEPLOYMENT.md", "RELEASE.md", "ROLLBACK.md"];
-for (const d of docsChecks) {
-  const r = checkDoc(d);
-  results.push({ ...r, name: d });
-  console.log(`  ${r.status === "PASS" ? "✓" : "✗"} ${d} — ${r.detail}`);
-}
-
-// Summary table
-console.log("\n=== Summary Table ===");
-const passCount = results.filter((r) => r.status === "PASS").length;
-const failCount = results.filter((r) => r.status === "FAIL").length;
-const total = results.length;
-
-// Pad names for alignment
-const namePad = Math.max(...results.map((r) => r.name.length)) + 2;
-console.log(`  ${"Subsystem".padEnd(namePad)} Status  Detail`);
-console.log(`  ${"".padEnd(namePad, "-")} ------  -----`);
-for (const r of results) {
-  const icon = r.status === "PASS" ? "✓" : "✗";
-  console.log(`  ${r.name.padEnd(namePad)} ${icon}      ${r.detail}`);
-}
-
-console.log(`\nResults: ${passCount}/${total} passed, ${failCount}/${total} failed`);
-if (failCount > 0) {
-  console.log("\nFailed subsystems:");
-  for (const r of results) {
-    if (r.status === "FAIL") {
-      console.log(`  ✗ ${r.name} — ${r.detail}`);
-    }
-  }
-}
-
-if (failCount === 0) {
-  console.log("\nProduction readiness: ok");
-  process.exit(0);
-} else {
-  console.error("\nProduction readiness: failed");
+console.log(`Evidence: ${evidencePath}`);
+if (blockingFailures.length > 0) {
+  console.error(`Production readiness: failed (${String(blockingFailures.length)} blocking gate(s))`);
   process.exit(1);
 }
+console.log("Production readiness: ok");

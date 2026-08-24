@@ -8,6 +8,13 @@ interface PackageManifest {
   readonly packageManager?: string;
 }
 
+const KNOWN_PACKAGE_MANAGERS = new Set<RepoResponse["packageManager"]>([
+  "pnpm",
+  "npm",
+  "yarn",
+  "bun",
+]);
+
 function gitValue(rootPath: string, args: readonly string[]): string | null {
   const result = spawnSync("git", [...args], {
     cwd: rootPath,
@@ -16,11 +23,15 @@ function gitValue(rootPath: string, args: readonly string[]): string | null {
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  return result.status === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
+  return result.status === 0 && result.stdout.trim().length > 0
+    ? result.stdout.trim()
+    : null;
 }
 
 function knownPackageManager(value: string | undefined): RepoResponse["packageManager"] | null {
-  return value === "pnpm" || value === "npm" || value === "yarn" || value === "bun" ? value : null;
+  if (!value) return null;
+  const candidate = value as RepoResponse["packageManager"];
+  return KNOWN_PACKAGE_MANAGERS.has(candidate) ? candidate : null;
 }
 
 function detectedPackageManager(
@@ -31,8 +42,12 @@ function detectedPackageManager(
   if (declared) return declared;
   if (existsSync(join(rootPath, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(rootPath, "yarn.lock"))) return "yarn";
-  if (existsSync(join(rootPath, "bun.lock")) || existsSync(join(rootPath, "bun.lockb")))
+  if (
+    existsSync(join(rootPath, "bun.lock")) ||
+    existsSync(join(rootPath, "bun.lockb"))
+  ) {
     return "bun";
+  }
   if (existsSync(join(rootPath, "package-lock.json"))) return "npm";
   return "unknown";
 }

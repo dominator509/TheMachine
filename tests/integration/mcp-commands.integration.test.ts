@@ -6,7 +6,7 @@ import { createMCPRegistry } from "@the-machine/mcp";
 import { createCommandRegistry } from "@the-machine/agent-runtime";
 import type { EntityId } from "@the-machine/core";
 
-function createMCPFixture(): string {
+function createMCPFixture(): { executable: string; args: string[] } {
   const dir = mkdtempSync(join(tmpdir(), "machine-mcp-"));
   const script = join(dir, "fixture.mjs");
   writeFileSync(
@@ -15,16 +15,22 @@ function createMCPFixture(): string {
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => { input += chunk; });
 process.stdin.on("end", () => {
-  const req = JSON.parse(input);
-  if (req.method === "explode") {
-    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, error: { message: "boom" } }));
-    return;
+  for (const line of input.split(/\\r?\\n/).filter(Boolean)) {
+    const req = JSON.parse(line);
+    if (req.method === "initialize") {
+      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { protocolVersion: req.params.protocolVersion, capabilities: {}, serverInfo: { name: "fixture", version: "1" } } }) + "\\n");
+    } else if (req.method === "tools/call") {
+      if (req.params.name === "explode") {
+        process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, error: { code: -32000, message: "boom" } }) + "\\n");
+      } else {
+        process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { tool: req.params.name, arguments: req.params.arguments } }) + "\\n");
+      }
+    }
   }
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { tool: req.method, params: req.params } }));
 });`,
     "utf-8",
   );
-  return `"${process.execPath}" "${script}"`;
+  return { executable: process.execPath, args: [script] };
 }
 
 describe("MCP registry", () => {
@@ -34,7 +40,8 @@ describe("MCP registry", () => {
       id: "mcp-1" as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: "/tmp/mcp.sock",
+      endpoint: process.execPath,
+      args: ["fixture.mjs"],
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });
@@ -47,7 +54,7 @@ describe("MCP registry", () => {
       id: "mcp-1" as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: "/tmp/mcp.sock",
+      endpoint: process.execPath,
       tools: [],
       permissions: [],
     });
@@ -67,7 +74,7 @@ describe("MCP registry", () => {
       id: "mcp-1" as EntityId,
       name: "test",
       transport: "stdio",
-      endpoint: "/tmp/sock",
+      endpoint: process.execPath,
       tools: [],
       permissions: [],
     });
@@ -75,18 +82,19 @@ describe("MCP registry", () => {
     expect(registry.list()).toHaveLength(0);
   });
 
-  it("invoke succeeds for permitted tool", async () => {
+  it("performs initialize then tools/call for a permitted tool", () => {
     const registry = createMCPRegistry();
-    const endpoint = createMCPFixture();
+    const fixture = createMCPFixture();
     registry.register({
       id: "mcp-1" as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint,
+      endpoint: fixture.executable,
+      args: fixture.args,
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });
-    const result = await registry.invoke("mcp-1" as EntityId, "read-file", {
+    const result = registry.invoke("mcp-1" as EntityId, "read-file", {
       path: "/tmp/test.txt",
     });
     expect(result.success).toBe(true);
@@ -94,44 +102,87 @@ describe("MCP registry", () => {
     expect(result.output).toContain("/tmp/test.txt");
   });
 
-  it("invoke fails for unknown server", async () => {
+  it("fails closed when a permitted tool still requires approval", () => {
     const registry = createMCPRegistry();
-    const result = await registry.invoke("unknown" as EntityId, "tool", {});
+    const fixture = createMCPFixture();
+    registry.register({
+      id: "mcp-1" as EntityId,
+      name: "write-tools",
+      transport: "stdio",
+      endpoint: fixture.executable,
+      args: fixture.args,
+      tools: [{ name: "write-file", description: "Write", inputSchema: {} }],
+      permissions: [{ toolName: "write-file", allowed: true, requireApproval: true }],
+    });
+
+    const blocked = registry.invoke("mcp-1" as EntityId, "write-file", {});
+    expect(blocked.success).toBe(false);
+    expect(blocked.error).toContain("requires explicit approval");
+
+    const approved = registry.invoke(
+      "mcp-1" as EntityId,
+      "write-file",
+      { value: "ok" },
+      { approved: true, approvalId: "approval-1" },
+    );
+    expect(approved.success).toBe(true);
+  });
+
+  it("returns an MCP tool error without treating it as success", () => {
+    const registry = createMCPRegistry();
+    const fixture = createMCPFixture();
+    registry.register({
+      id: "mcp-1" as EntityId,
+      name: "error-tools",
+      transport: "stdio",
+      endpoint: fixture.executable,
+      args: fixture.args,
+      tools: [{ name: "explode", description: "Fail", inputSchema: {} }],
+      permissions: [{ toolName: "explode", allowed: true, requireApproval: false }],
+    });
+    const result = registry.invoke("mcp-1" as EntityId, "explode", {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("boom");
+  });
+
+  it("invoke fails for unknown server", () => {
+    const registry = createMCPRegistry();
+    const result = registry.invoke("unknown" as EntityId, "tool", {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("not found");
   });
 
-  it("invoke fails for unknown tool", async () => {
+  it("invoke fails for unknown tool", () => {
     const registry = createMCPRegistry();
     registry.register({
       id: "mcp-1" as EntityId,
       name: "test",
       transport: "stdio",
-      endpoint: "/tmp/sock",
+      endpoint: process.execPath,
       tools: [],
       permissions: [],
     });
-    const result = await registry.invoke("mcp-1" as EntityId, "nonexistent", {});
+    const result = registry.invoke("mcp-1" as EntityId, "nonexistent", {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("Unknown tool");
   });
 
-  it("invoke fails for unpermitted tool", async () => {
+  it("invoke fails for unpermitted tool", () => {
     const registry = createMCPRegistry();
     registry.register({
       id: "mcp-1" as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: "/tmp/mcp.sock",
+      endpoint: process.execPath,
       tools: [{ name: "write-file", description: "Write a file", inputSchema: {} }],
       permissions: [{ toolName: "write-file", allowed: false, requireApproval: true }],
     });
-    const result = await registry.invoke("mcp-1" as EntityId, "write-file", {});
+    const result = registry.invoke("mcp-1" as EntityId, "write-file", {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("not permitted");
   });
 
-  it("invoke returns explicit error for unsupported transports", async () => {
+  it("returns explicit error for unsupported transports", () => {
     const registry = createMCPRegistry();
     registry.register({
       id: "mcp-1" as EntityId,
@@ -141,7 +192,7 @@ describe("MCP registry", () => {
       tools: [{ name: "read", description: "Read", inputSchema: {} }],
       permissions: [{ toolName: "read", allowed: true, requireApproval: false }],
     });
-    const result = await registry.invoke("mcp-1" as EntityId, "read", {});
+    const result = registry.invoke("mcp-1" as EntityId, "read", {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("not supported");
   });

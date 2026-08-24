@@ -34,4 +34,11 @@ export { createProductionApprovalHandler } from "./productionApprovalHandler.js"
 export type { ProductionApprovalHandler } from "./productionApprovalHandler.js";
 
 export { createReadinessHandler } from "./readinessHandler.js";
-export type { ReadinessHandler } from "./readinessHandler.js";
+export type {
+  ReadinessHandler,
+  ReadinessDependencies,
+  ReadinessEvidenceSource,
+  ExecutedReadinessEvidence,
+} from "./readinessHandler.js";
+
+export { createFileReadinessEvidenceSource } from "./readinessEvidence.js";
