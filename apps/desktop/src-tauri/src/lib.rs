@@ -444,11 +444,15 @@ fn machine_cancel_job(registry: State<'_, Arc<JobRegistry>>, job_id: String) -> 
         .get(&job_id)
         .cloned()
         .ok_or_else(|| format!("job not found: {job_id}"))?;
-    child
-        .lock()
-        .map_err(|_| "job lock was poisoned".to_string())?
-        .kill()
-        .map_err(|error| format!("unable to terminate job: {error}"))
+    let result = {
+        let mut locked_child = child
+            .lock()
+            .map_err(|_| "job lock was poisoned".to_string())?;
+        locked_child
+            .kill()
+            .map_err(|error| format!("unable to terminate job: {error}"))
+    };
+    result
 }
 
 pub fn run() {
