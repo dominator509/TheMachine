@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import type { EntityId } from "@the-machine/core";
 import type {
   MCPInvocationOptions,
@@ -16,7 +17,10 @@ const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
-const STDIO_HELPER = fileURLToPath(new URL("./stdio-helper.js", import.meta.url));
+const colocatedStdioHelper = fileURLToPath(new URL("./stdio-helper.js", import.meta.url));
+const STDIO_HELPER = existsSync(colocatedStdioHelper)
+  ? colocatedStdioHelper
+  : fileURLToPath(new URL("../dist/stdio-helper.js", import.meta.url));
 const DENIED_EXECUTABLES = new Set([
   "bash",
   "bash.exe",

@@ -77,14 +77,16 @@ for (const repositoryPath of paths) {
   for (const [label, pattern] of HIGH_CONFIDENCE_PATTERNS) {
     pattern.lastIndex = 0;
     const match = pattern.exec(text);
-    if (match) failures.push(`${repositoryPath}:${lineNumber(text, match.index)}: possible ${label}`);
+    if (match)
+      failures.push(`${repositoryPath}:${lineNumber(text, match.index)}: possible ${label}`);
   }
   if (repositoryPath.startsWith(".github/workflows/") && /\.ya?ml$/i.test(repositoryPath)) {
     checkWorkflow(repositoryPath, text);
   }
 }
 
-if (scannedFiles === 0) failures.push("Security scan vacuity guard: zero tracked text files were scanned.");
+if (scannedFiles === 0)
+  failures.push("Security scan vacuity guard: zero tracked text files were scanned.");
 console.log(
   `security scan: ${String(scannedFiles)} text files, ${String(skippedBinary)} binary files skipped, ${String(skippedLarge)} oversized files skipped`,
 );
@@ -111,9 +113,13 @@ function checkWorkflow(repositoryPath, text) {
       }
     }
     if (/\bnpm\s+(?:install|i)\b[^\n]*@latest\b/i.test(line)) {
-      failures.push(`${repositoryPath}:${String(index + 1)}: npm installs a floating @latest package`);
+      failures.push(
+        `${repositoryPath}:${String(index + 1)}: npm installs a floating @latest package`,
+      );
     }
-    if (/\b(?:pip|python\s+-m\s+pip)\s+install\b[^#\n]*(?:aider-chat|openhands)(?!\s*==)/i.test(line)) {
+    if (
+      /\b(?:pip|python\s+-m\s+pip)\s+install\b[^#\n]*(?:aider-chat|openhands)(?!\s*==)/i.test(line)
+    ) {
       failures.push(
         `${repositoryPath}:${String(index + 1)}: benchmark worker installation is not version-pinned`,
       );

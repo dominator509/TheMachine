@@ -102,6 +102,13 @@ export function createDefaultClient(opts: ClientFactoryOptions = {}): ServiceCli
     approval,
     readiness:
       opts.readiness ??
-      createReadinessHandler({ providers: provider, mcp, plugins: plugin, ui, approval, evidence }),
+      createReadinessHandler({
+        providers: provider,
+        mcp,
+        plugins: plugin,
+        ui,
+        approval,
+        ...(evidence === undefined ? {} : { evidence }),
+      }),
   });
 }

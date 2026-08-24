@@ -1,10 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import type {
-  ExecutedReadinessEvidence,
-  ReadinessEvidenceSource,
-} from "./readinessHandler.js";
+import type { ExecutedReadinessEvidence, ReadinessEvidenceSource } from "./readinessHandler.js";
 
 interface ReadinessEvidenceDocument {
   readonly schemaVersion: number;

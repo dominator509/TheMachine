@@ -24,8 +24,8 @@ const RELEASE_DIR = process.env.MACHINE_RELEASE_DIR
   ? join(ROOT, process.env.MACHINE_RELEASE_DIR)
   : join(ROOT, "release");
 const STAGING_DIR = join(RELEASE_DIR, ".staging", "cli");
-const PNPM = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
+const PNPM_CLI = process.env.npm_execpath;
+const NPM_CLI = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
 const ROOT_PACKAGE = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
 const STORAGE_PACKAGE = JSON.parse(
   readFileSync(join(ROOT, "packages", "storage", "package.json"), "utf-8"),
@@ -39,6 +39,20 @@ function command(executable, args, options = {}) {
     shell: false,
     env: { ...process.env, ...options.env },
   });
+}
+
+function packageManager(args) {
+  if (!PNPM_CLI || !existsSync(PNPM_CLI)) {
+    throw new Error("Release build requires invocation through `pnpm run build:release`.");
+  }
+  command(process.execPath, [PNPM_CLI, ...args]);
+}
+
+function captureNpm(args) {
+  if (!existsSync(NPM_CLI)) {
+    throw new Error(`npm CLI entry point not found: ${NPM_CLI}`);
+  }
+  return capture(process.execPath, [NPM_CLI, ...args]);
 }
 
 function capture(executable, args) {
@@ -160,12 +174,12 @@ if (process.argv.includes("--sign")) {
 rmSync(RELEASE_DIR, { recursive: true, force: true });
 mkdirSync(STAGING_DIR, { recursive: true, mode: 0o700 });
 console.log(`Building The Machine CLI ${version} from ${candidateSha}...`);
-command(PNPM, ["release:versions"]);
-command(PNPM, ["build"]);
+packageManager(["release:versions"]);
+packageManager(["build"]);
 
 const machinePath = join(STAGING_DIR, "machine.js");
 const metafilePath = join(RELEASE_DIR, "cli-esbuild-metafile.json");
-command(PNPM, [
+packageManager([
   "exec",
   "esbuild",
   "apps/cli/src/index.ts",
@@ -201,7 +215,7 @@ cpSync(join(ROOT, "README.md"), join(STAGING_DIR, "README.md"));
 cpSync(join(ROOT, "LICENSE"), join(STAGING_DIR, "LICENSE"));
 setTreeTimestamp(STAGING_DIR, sourceDateEpoch);
 
-const packOutput = capture(NPM, [
+const packOutput = captureNpm([
   "pack",
   STAGING_DIR,
   "--pack-destination",

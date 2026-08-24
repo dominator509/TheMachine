@@ -70,13 +70,7 @@ describe("readiness evidence hardening", () => {
     expect(provider.healthy).toBe(false);
 
     const mcp = createMCPHandler();
-    const server = mcp.register(
-      "mcp" as EntityId,
-      "MCP",
-      "stdio",
-      process.execPath,
-      ["tool"],
-    );
+    const server = mcp.register("mcp" as EntityId, "MCP", "stdio", process.execPath, ["tool"]);
     expect(server.healthy).toBe(false);
 
     const plugins = createPluginHandler();

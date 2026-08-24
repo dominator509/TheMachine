@@ -11,11 +11,9 @@ function createMCPFixture(): { executable: string; args: string[] } {
   const script = join(dir, "fixture.mjs");
   writeFileSync(
     script,
-    `let input = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", () => {
-  for (const line of input.split(/\\r?\\n/).filter(Boolean)) {
+    `import { createInterface } from "node:readline";
+const lines = createInterface({ input: process.stdin });
+lines.on("line", (line) => {
     const req = JSON.parse(line);
     if (req.method === "initialize") {
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { protocolVersion: req.params.protocolVersion, capabilities: {}, serverInfo: { name: "fixture", version: "1" } } }) + "\\n");
@@ -26,7 +24,6 @@ process.stdin.on("end", () => {
         process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { tool: req.params.name, arguments: req.params.arguments } }) + "\\n");
       }
     }
-  }
 });`,
     "utf-8",
   );
@@ -226,7 +223,12 @@ describe("command registry", () => {
 
   it("execute runs registered command", async () => {
     const registry = createCommandRegistry();
-    registry.register({ name: "greet", script: "echo Hello", description: "Say hello" });
+    registry.register({
+      name: "greet",
+      executable: process.execPath,
+      args: ["-e", "console.log('Hello')"],
+      description: "Say hello",
+    });
     const result = await registry.execute("greet");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Hello");

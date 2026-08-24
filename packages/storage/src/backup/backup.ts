@@ -57,7 +57,10 @@ async function sha256File(filePath: string): Promise<string> {
 }
 
 function syncFile(filePath: string): void {
-  const descriptor = openSync(filePath, "r");
+  // Windows rejects FlushFileBuffers for a read-only handle. The backup and
+  // restore staging files are owned by this process, so request write access
+  // while preserving the same explicit durability boundary.
+  const descriptor = openSync(filePath, process.platform === "win32" ? "r+" : "r");
   try {
     fsyncSync(descriptor);
   } finally {
@@ -81,16 +84,22 @@ function countRows(connection: DbConnection): DatabaseVerification {
   const quickCheck = connection.db.pragma("quick_check", { simple: true }) as string;
   if (quickCheck !== "ok") throw new Error(`SQLite quick_check failed: ${quickCheck}`);
   const migrationTable = connection.db
-    .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='_migrations'")
+    .prepare(
+      "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='_migrations'",
+    )
     .get() as { count: number };
   const migrationCount =
     migrationTable.count === 1
-      ? (connection.db.prepare("SELECT COUNT(*) AS count FROM _migrations").get() as {
-          count: number;
-        }).count
+      ? (
+          connection.db.prepare("SELECT COUNT(*) AS count FROM _migrations").get() as {
+            count: number;
+          }
+        ).count
       : 0;
   const tableCount = (
-    connection.db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table'").get() as {
+    connection.db
+      .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table'")
+      .get() as {
       count: number;
     }
   ).count;
@@ -154,9 +163,7 @@ export async function getBackupInfo(
  * verifies a staging database, atomically swaps paths, verifies the installed
  * database, and restores the previous database if final verification fails.
  */
-export async function restoreBackup(
-  options: RestoreBackupOptions,
-): Promise<RestoreBackupResult> {
+export async function restoreBackup(options: RestoreBackupOptions): Promise<RestoreBackupResult> {
   const backupPath = resolve(options.backupPath);
   const targetPath = resolve(options.targetPath);
   if (backupPath === targetPath) throw new Error("Backup and target paths must differ.");
@@ -175,7 +182,7 @@ export async function restoreBackup(
       `Backup checksum mismatch: expected ${options.expectedSha256.toLowerCase()}, received ${backupDigest}.`,
     );
   }
-  const sourceVerification = verifyDatabase(backupPath);
+  verifyDatabase(backupPath);
   const targetDirectory = dirname(targetPath);
   mkdirSync(targetDirectory, { recursive: true, mode: 0o700 });
   const stagingPath = `${targetPath}.restore-${randomUUID()}.tmp`;
@@ -219,7 +226,8 @@ export async function restoreBackup(
   } catch (error) {
     rmSync(stagingPath, { force: true });
     rmSync(targetPath, { force: true });
-    if (previousPath && previousMoved && existsSync(previousPath)) renameSync(previousPath, targetPath);
+    if (previousPath && previousMoved && existsSync(previousPath))
+      renameSync(previousPath, targetPath);
     syncDirectory(targetDirectory);
     throw error;
   }

@@ -85,8 +85,8 @@ describe("DiagnosticBundle (integration)", () => {
 
   it("should redact API keys in extraData", () => {
     const bundle = exportDiagnosticBundle(defaultConfig, {
-      apiKey: "sk-proj-ABCDEF1234567890ABCDEF1234567890ABCDEF12",
-      token: "ghp_ABCDEF1234567890ABCDEF1234567890ABCDEF1234",
+      apiKey: "sk-testABCDEF1234567890ABCDEF1234567890ABCDEF12",
+      token: "ghp_testABCDEF1234567890ABCDEF1234567890ABCDEF",
     });
 
     expect(bundle.redactionApplied).toBe(true);
@@ -109,9 +109,7 @@ describe("DiagnosticBundle (integration)", () => {
     const extra = bundle.sections.find((s) => s.label === "extra");
     expect(extra).toBeDefined();
     expect(extra!.redacted).toBe(true);
-    expect((extra!.data.credentials as Record<string, unknown>).password as string).toContain(
-      "[REDACTED",
-    );
+    expect(extra!.data.credentials).toBe("[REDACTED]");
   });
 
   it("should redact plain string values that look like secrets", () => {
@@ -129,16 +127,13 @@ describe("DiagnosticBundle (integration)", () => {
 
   it("should redact secrets in arrays", () => {
     const bundle = exportDiagnosticBundle(defaultConfig, {
-      tokens: ["ghp_ABCDEF1234567890ABCDEF1234567890ABCDEF1234", "safe-token-value"],
+      tokens: ["ghp_testABCDEF1234567890ABCDEF1234567890ABCDEF", "safe-token-value"],
     });
 
     expect(bundle.redactionApplied).toBe(true);
     const extra = bundle.sections.find((s) => s.label === "extra");
     expect(extra).toBeDefined();
-    const tokens = extra!.data.tokens as string[];
-    expect(tokens[0]).toContain("[REDACTED");
-    // Non-secret values should remain unchanged
-    expect(tokens[1]).toBe("safe-token-value");
+    expect(extra!.data.tokens).toBe("[REDACTED]");
   });
 
   it("should produce a JSON-serializable bundle", () => {

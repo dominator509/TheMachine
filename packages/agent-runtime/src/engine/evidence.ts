@@ -1,9 +1,4 @@
-import {
-  createHash,
-  createPublicKey,
-  sign as signData,
-  verify as verifyData,
-} from "node:crypto";
+import { createHash, createPublicKey, sign as signData, verify as verifyData } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -123,7 +118,10 @@ function finalPatch(manifest: RunManifest): string {
   }
 }
 
-function maybeSignChecksumManifest(directory: string, checksumManifest: string): "created" | "missing" {
+function maybeSignChecksumManifest(
+  directory: string,
+  checksumManifest: string,
+): "created" | "missing" {
   const privateKey = process.env["MACHINE_EVIDENCE_SIGNING_KEY"];
   if (!privateKey) return "missing";
   const signature = signData(null, Buffer.from(checksumManifest, "utf-8"), privateKey);
@@ -181,7 +179,10 @@ export function writeEvidenceBundle(input: {
   return { directory, checksums, signature };
 }
 
-function signatureStatus(directory: string, checksumManifest: string): EvidenceVerification["signature"] {
+function signatureStatus(
+  directory: string,
+  checksumManifest: string,
+): EvidenceVerification["signature"] {
   const signaturePath = join(directory, SIGNATURE_FILE);
   if (!existsSync(signaturePath)) return "missing";
   const verificationKey = process.env["MACHINE_EVIDENCE_VERIFY_KEY"];
@@ -224,7 +225,12 @@ export function verifyEvidenceBundle(directory: string): EvidenceVerification {
     }
     const expected = match[1] ?? "";
     const name = match[2] ?? "";
-    if (basename(name) !== name || name.includes("..") || name === CHECKSUM_FILE || name === SIGNATURE_FILE) {
+    if (
+      basename(name) !== name ||
+      name.includes("..") ||
+      name === CHECKSUM_FILE ||
+      name === SIGNATURE_FILE
+    ) {
       mismatched.push(name);
       continue;
     }

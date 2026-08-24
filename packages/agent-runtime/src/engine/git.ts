@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readlinkSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { buildSafeEnvironment } from "../process.js";
 
@@ -134,8 +128,7 @@ function parseNullSeparated(output: string): string[] {
 
 function listIgnoredFiles(worktreePath: string): string[] {
   return parseNullSeparated(
-    runGit(worktreePath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"])
-      .stdout,
+    runGit(worktreePath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]).stdout,
   );
 }
 
