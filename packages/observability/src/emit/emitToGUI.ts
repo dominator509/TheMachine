@@ -255,7 +255,12 @@ export async function emitToGUIAsync(
   const resolved = resolvedConfig(config);
   const { event, errors } = cleanInput(input, resolved.defaultTheme);
   try {
-    const result = await postEvent(event, resolved.webhookUrl, resolved.timeout, resolved.eventToken);
+    const result = await postEvent(
+      event,
+      resolved.webhookUrl,
+      resolved.timeout,
+      resolved.eventToken,
+    );
     if (!result.ok) logFallback(event, errors, resolved.webhookUrl, result.reason);
     return result.ok
       ? { success: true, event, validationErrors: errors }

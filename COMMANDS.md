@@ -12,30 +12,41 @@ Default package manager is `pnpm` with Node.js 20 LTS. If EP-000 discovers a dif
 
 ## Allowed Commands
 
-| Purpose                       | Command                                   |
-| ----------------------------- | ----------------------------------------- |
-| Preflight                     | `./scripts/preflight.sh`                  |
-| Install                       | `./scripts/install.sh`                    |
-| Lint                          | `./scripts/lint.sh`                       |
-| Format check                  | `./scripts/format-check.sh`               |
-| Typecheck                     | `./scripts/typecheck.sh`                  |
-| Unit tests                    | `./scripts/test-unit.sh`                  |
-| Integration tests             | `./scripts/test-integration.sh`           |
-| E2E tests                     | `./scripts/test-e2e.sh`                   |
-| Build                         | `./scripts/build.sh`                      |
-| Release build                 | `pnpm run build:release`                  |
-| Security check                | `./scripts/security-check.sh`             |
-| Dependency audit              | `./scripts/dependency-audit.sh`           |
-| Smoke test                    | `./scripts/smoke-test.sh`                 |
-| Full verification             | `./scripts/verify.sh`                     |
-| Production readiness check    | `./scripts/production-readiness-check.sh` |
-| Local development             | `pnpm run dev`                            |
-| Local database setup          | `pnpm run db:setup`                       |
-| Create migration              | `pnpm run db:migration:create -- <name>`  |
-| Run migrations                | `pnpm run db:migrate`                     |
-| Rollback last local migration | `pnpm run db:migrate:rollback`            |
-| Git changed files review      | `git diff --name-only`                    |
-| Git status review             | `git status --short`                      |
+| Purpose                               | Command                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preflight                             | `./scripts/preflight.sh`                                                                                                                    |
+| Install                               | `./scripts/install.sh`                                                                                                                      |
+| Lint                                  | `./scripts/lint.sh`                                                                                                                         |
+| Format check                          | `./scripts/format-check.sh`                                                                                                                 |
+| Format eligible files                 | `pnpm exec prettier --write .`                                                                                                              |
+| Typecheck                             | `./scripts/typecheck.sh`                                                                                                                    |
+| Unit tests                            | `./scripts/test-unit.sh`                                                                                                                    |
+| Integration tests                     | `./scripts/test-integration.sh`                                                                                                             |
+| E2E tests                             | `./scripts/test-e2e.sh`                                                                                                                     |
+| Build                                 | `./scripts/build.sh`                                                                                                                        |
+| Release build                         | `pnpm run build:release`                                                                                                                    |
+| Generate native icons                 | `pnpm --filter @the-machine/desktop tauri icon src-tauri/icons/icon.png`                                                                    |
+| Generate native lockfile              | `cargo generate-lockfile --manifest-path apps/desktop/src-tauri/Cargo.toml`                                                                 |
+| Verify native lockfile                | `cargo metadata --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --format-version 1`                                              |
+| Check native formatting               | `cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check`                                                                       |
+| Native tests                          | `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked`                                                                     |
+| Native lint                           | `cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings`                                      |
+| Native desktop build                  | `pnpm --filter @the-machine/desktop tauri build --no-bundle`                                                                                |
+| Security check                        | `./scripts/security-check.sh`                                                                                                               |
+| Dependency audit                      | `./scripts/dependency-audit.sh`                                                                                                             |
+| Smoke test                            | `./scripts/smoke-test.sh`                                                                                                                   |
+| Full verification                     | `./scripts/verify.sh`                                                                                                                       |
+| Production readiness check            | `./scripts/production-readiness-check.sh`                                                                                                   |
+| Local development                     | `pnpm run dev`                                                                                                                              |
+| Local database setup                  | `pnpm run db:setup`                                                                                                                         |
+| Create migration                      | `pnpm run db:migration:create -- <name>`                                                                                                    |
+| Run migrations                        | `pnpm run db:migrate`                                                                                                                       |
+| Rollback last local migration         | `pnpm run db:migrate:rollback`                                                                                                              |
+| Git changed files review              | `git diff --name-only`                                                                                                                      |
+| Git status review                     | `git status --short`                                                                                                                        |
+| Initialize disposable validation repo | `git init -b validation <temporary-path>`                                                                                                   |
+| Stage disposable validation repo      | `git -C <temporary-path> add -A`                                                                                                            |
+| Commit disposable validation repo     | `git -C <temporary-path> -c user.name="The Machine Validation" -c user.email="validation@example.invalid" commit -m "validation candidate"` |
 
 ## Windows Native Equivalents
 

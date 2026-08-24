@@ -61,18 +61,17 @@ export interface ReadinessDependencies {
   readonly evidence?: ReadinessEvidenceSource;
 }
 
-function gate(
-  subsystem: string,
-  checks: readonly boolean[],
-  failed = false,
-): ReadinessGateSummary {
+function gate(subsystem: string, checks: readonly boolean[], failed = false): ReadinessGateSummary {
   const passedChecks = checks.filter(Boolean).length;
   const totalChecks = checks.length;
   const status = passedChecks === totalChecks ? "completed" : failed ? "failed" : "pending";
   return { subsystem, status, passedChecks, totalChecks };
 }
 
-function executionState(source: ReadinessEvidenceSource | undefined, subsystem: string): {
+function executionState(
+  source: ReadinessEvidenceSource | undefined,
+  subsystem: string,
+): {
   checks: boolean[];
   failed: boolean;
 } {
@@ -89,14 +88,14 @@ function executionState(source: ReadinessEvidenceSource | undefined, subsystem: 
   ];
   const failed =
     record !== null &&
-    (!candidateMatches || record.checkCount < 1 || record.evidenceDigest.trim().length === 0 || !record.passed);
+    (!candidateMatches ||
+      record.checkCount < 1 ||
+      record.evidenceDigest.trim().length === 0 ||
+      !record.passed);
   return { checks, failed };
 }
 
-function executedGate(
-  subsystem: string,
-  evidence?: ReadinessEvidenceSource,
-): ReadinessGateSummary {
+function executedGate(subsystem: string, evidence?: ReadinessEvidenceSource): ReadinessGateSummary {
   const execution = executionState(evidence, subsystem);
   return gate(subsystem, execution.checks, execution.failed);
 }
@@ -199,7 +198,9 @@ export function createReadinessHandler(deps: ReadinessDependencies = {}): Readin
         uiGate(deps),
       ];
 
-      const filtered = req.subsystem ? gates.filter((candidate) => candidate.subsystem === req.subsystem) : gates;
+      const filtered = req.subsystem
+        ? gates.filter((candidate) => candidate.subsystem === req.subsystem)
+        : gates;
       const anyFailed = filtered.some((candidate) => candidate.status === "failed");
       const allCompleted =
         filtered.length > 0 && filtered.every((candidate) => candidate.status === "completed");

@@ -231,9 +231,9 @@ test("readiness UI formats diagnostics with PASS/FAIL", () => {
 });
 
 test("redact export redacts API keys and timestamps", () => {
-  const result = redactExport("sk-abc123def456ghi789jklmnopqrs");
+  const result = redactExport("sk-test123def456ghi789jklmnopqrs");
   expect(result.redactedFields).toContain("openaiApiKey");
-  expect(result.data).not.toContain("sk-abc123def456ghi789jklmnopqrs");
+  expect(result.data).not.toContain("sk-test123def456ghi789jklmnopqrs");
   expect(result.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 });
 

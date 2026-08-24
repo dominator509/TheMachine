@@ -93,6 +93,7 @@ function parseJsonLines<T>(filePath: string, label: string): T[] {
     } catch (error) {
       throw new Error(
         `${label} contains invalid JSON at line ${String(index + 1)}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       );
     }
   }
@@ -256,7 +257,11 @@ export class RunStateStore {
     durableAppend(this.eventsPath(manifest.runId), `${JSON.stringify(recorded)}\n`);
     atomicWrite(this.manifestPath(manifest.runId), `${JSON.stringify(nextManifest, null, 2)}\n`);
     durableRemove(this.eventTransactionPath(manifest.runId));
-    Object.assign(manifest, nextManifest);
+    // appendEvent only advances event metadata. Replacing the whole manifest
+    // would invalidate task-state references held by the active orchestrator,
+    // causing later completion mutations to land on detached objects.
+    manifest.nextSequence = nextManifest.nextSequence;
+    manifest.updatedAt = nextManifest.updatedAt;
     return recorded;
   }
 
@@ -270,10 +275,7 @@ export class RunStateStore {
   }
 
   readApprovals(runId: string): ApprovalRecord[] {
-    return parseJsonLines<ApprovalRecord>(
-      this.approvalsPath(runId),
-      `Run '${runId}' approval log`,
-    );
+    return parseJsonLines<ApprovalRecord>(this.approvalsPath(runId), `Run '${runId}' approval log`);
   }
 
   latestApproval(

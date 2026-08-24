@@ -57,8 +57,9 @@ function emit(result: HelperResult): void {
   settled = true;
   if (timer) clearTimeout(timer);
   terminateChild();
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exitCode = result.success ? 0 : 1;
+  process.stdout.write(`${JSON.stringify(result)}\n`, () => {
+    process.exit(result.success ? 0 : 1);
+  });
 }
 
 function rpcError(prefix: string, response: JsonRpcResponse): string {

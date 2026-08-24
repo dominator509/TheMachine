@@ -15,21 +15,23 @@ import { createOpenAIAdapter } from "@the-machine/providers";
 import type { EntityId } from "@the-machine/core";
 import type { ProviderFetch } from "@the-machine/providers";
 
-function createMCPFixture(): string {
+function createMCPFixture(): { executable: string; args: string[] } {
   const dir = mkdtempSync(join(tmpdir(), "machine-sec-mcp-"));
   const script = join(dir, "fixture.mjs");
   writeFileSync(
     script,
-    `let input = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", () => {
-  const req = JSON.parse(input);
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { ok: true } }));
+    `import { createInterface } from "node:readline";
+const lines = createInterface({ input: process.stdin });
+lines.on("line", (line) => {
+  const req = JSON.parse(line);
+  const result = req.method === "initialize"
+    ? { protocolVersion: req.params.protocolVersion, capabilities: {}, serverInfo: { name: "fixture", version: "1" } }
+    : { ok: true };
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result }) + "\\n");
 });`,
     "utf-8",
   );
-  return `"${process.execPath}" "${script}"`;
+  return { executable: process.execPath, args: [script] };
 }
 
 const providerFetch: ProviderFetch = async () =>
@@ -45,7 +47,12 @@ describe("secure command registry", () => {
   it("should deny unpermitted commands", async () => {
     const permissions = createPermissionRegistry();
     const registry = createSecureCommandRegistry(permissions);
-    registry.register({ name: "allowed", script: "echo ok", description: "" });
+    registry.register({
+      name: "allowed",
+      executable: process.execPath,
+      args: ["-e", "console.log('ok')"],
+      description: "",
+    });
 
     const result = await registry.execute("allowed");
     expect(result.exitCode).toBe(1);
@@ -61,7 +68,12 @@ describe("secure command registry", () => {
       requireApproval: false,
     });
     const registry = createSecureCommandRegistry(permissions);
-    registry.register({ name: "allowed", script: "echo ok", description: "" });
+    registry.register({
+      name: "allowed",
+      executable: process.execPath,
+      args: ["-e", "console.log('ok')"],
+      description: "",
+    });
 
     const result = await registry.execute("allowed");
     expect(result.exitCode).toBe(0);
@@ -72,11 +84,13 @@ describe("secure MCP registry", () => {
   it("should deny unpermitted tools", () => {
     const permissions = createPermissionRegistry();
     const inner = createMCPRegistry();
+    const fixture = createMCPFixture();
     inner.register({
       id: "mcp-1" as unknown as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: createMCPFixture(),
+      endpoint: fixture.executable,
+      args: fixture.args,
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });
@@ -96,11 +110,13 @@ describe("secure MCP registry", () => {
       requireApproval: false,
     });
     const inner = createMCPRegistry();
+    const fixture = createMCPFixture();
     inner.register({
       id: "mcp-1" as unknown as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: createMCPFixture(),
+      endpoint: fixture.executable,
+      args: fixture.args,
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });

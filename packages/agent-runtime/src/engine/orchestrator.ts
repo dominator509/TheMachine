@@ -283,12 +283,6 @@ export class AgenticRuntime {
     if (!TERMINAL_RUN_STATUSES.has(manifest.status)) {
       store.requestCancellation(runId, actor, reason);
       manifest.cancellationRequested = true;
-      store.appendEvent(manifest, {
-        type: "run.cancellation_requested",
-        taskId: manifest.currentTaskId,
-        workerId: null,
-        payload: { actor, reason },
-      });
     }
     return manifest;
   }
@@ -621,6 +615,10 @@ export class AgenticRuntime {
       const workerFailure = await this.runWorker(store, manifest, task, state, attempt, worker);
       if (workerFailure) {
         await this.failAttempt(store, manifest, state, attempt, workerFailure);
+        if (workerFailure.category === "cancelled") {
+          this.markCancelled(store, manifest, state);
+          return false;
+        }
         if (!workerFailure.retryable) break;
         continue;
       }

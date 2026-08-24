@@ -10,10 +10,17 @@ export {
   startGuiServer,
   stopGuiServer,
   getSseClientCount,
+  getGuiServerAccess,
+  getGuiServerConfig,
   listThemes,
   loadTheme,
 } from "./gui/index.js";
-export type { GuiServerConfig, ThemeManifest } from "./gui/index.js";
+export type {
+  GuiServerAccess,
+  GuiServerConfig,
+  PublicGuiServerConfig,
+  ThemeManifest,
+} from "./gui/index.js";
 
 export function createService(opts: ClientFactoryOptions = {}): ServiceClient {
   return createDefaultClient(opts);

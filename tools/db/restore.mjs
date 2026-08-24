@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  isTempPath,
-  loadStorageApi,
-  resolveDbPath,
-} from "./common.mjs";
+import { isTempPath, loadStorageApi, resolveDbPath } from "./common.mjs";
 
-const backupArgument = process.argv.find((argument) => !argument.startsWith("--"));
+const backupArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
 const approved = process.argv.includes("--yes");
 const expectedSha256 = process.argv
   .find((argument) => argument.startsWith("--sha256="))
@@ -15,9 +11,7 @@ const expectedSha256 = process.argv
 const targetPath = resolveDbPath();
 
 if (!backupArgument) {
-  console.error(
-    "Usage: node tools/db/restore.mjs <backup.sqlite> --yes [--sha256=<expected>]",
-  );
+  console.error("Usage: node tools/db/restore.mjs <backup.sqlite> --yes [--sha256=<expected>]");
   process.exit(2);
 }
 const backupPath = resolve(backupArgument);

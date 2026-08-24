@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,7 +8,7 @@ import {
   getGuiServerAccess,
   startGuiServer,
   stopGuiServer,
-} from "@the-machine/service";
+} from "../../packages/service/dist/index.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI_PATH = join(ROOT, "apps", "cli", "dist", "index.js");
@@ -49,16 +43,21 @@ function git(cwd: string, args: readonly string[]): string {
 function createAgenticFixture(): { parent: string; repository: string; planPath: string } {
   const parent = mkdtempSync(join(tmpdir(), "machine-e2e-"));
   const repository = join(parent, "repository");
-  const mkdir = spawnSync(process.execPath, ["-e", "require('node:fs').mkdirSync(process.argv[1],{recursive:true})", repository], {
-    encoding: "utf-8",
-    shell: false,
-  });
+  const mkdir = spawnSync(
+    process.execPath,
+    ["-e", "require('node:fs').mkdirSync(process.argv[1],{recursive:true})", repository],
+    {
+      encoding: "utf-8",
+      shell: false,
+    },
+  );
   if (mkdir.status !== 0) throw new Error(mkdir.stderr);
 
   git(repository, ["init"]);
   git(repository, ["config", "user.name", "The Machine E2E"]);
   git(repository, ["config", "user.email", "e2e@example.invalid"]);
   writeFileSync(join(repository, "README.md"), "# Fixture\n", "utf-8");
+  writeFileSync(join(repository, ".gitignore"), ".machine/\n", "utf-8");
   writeFileSync(
     join(repository, "worker.mjs"),
     `import { writeFileSync } from "node:fs";

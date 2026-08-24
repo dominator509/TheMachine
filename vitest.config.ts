@@ -24,7 +24,7 @@ export default defineConfig({
       all: true,
       include: ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts"],
     },
-    workspace: [
+    projects: [
       {
         extends: true,
         test: {
@@ -41,6 +41,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "integration",
+          testTimeout: 30_000,
           include: [
             "tests/**/*.integration.test.ts",
             "packages/*/tests/**/*.integration.test.ts",

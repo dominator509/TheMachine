@@ -126,57 +126,58 @@ describe("plugin trust boundary", () => {
 
   it("runs an explicitly trusted subprocess hook", async () => {
     const directory = plugin({
-      "plugin.mjs": "export function onExecute(ctx,input){ return {id:ctx.pluginId,value:input.value}; }",
+      "plugin.mjs":
+        "export function onExecute(ctx,input){ return {id:ctx.pluginId,value:input.value}; }",
     });
-    const result = await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnExecute(
-      instance(join(directory, "plugin.mjs")),
-      context(directory),
-      { value: "ok" },
-    );
+    const result = await createSandboxedExecutor({
+      isolation: "trusted-subprocess",
+    }).executeOnExecute(instance(join(directory, "plugin.mjs")), context(directory), {
+      value: "ok",
+    });
     expect(result).toEqual({ success: true, output: { id: "plugin-test", value: "ok" } });
   });
 
   it("denies trusted-subprocess reads outside approved roots", async () => {
     const outside = plugin({ "secret.txt": "do-not-read" });
     const directory = plugin({
-      "plugin.mjs": "import {readFileSync} from 'node:fs'; export function onExecute(ctx,input){ return readFileSync(input.path,'utf8'); }",
+      "plugin.mjs":
+        "import {readFileSync} from 'node:fs'; export function onExecute(ctx,input){ return readFileSync(input.path,'utf8'); }",
     });
-    const result = await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnExecute(
-      instance(join(directory, "plugin.mjs")),
-      context(directory),
-      { path: join(outside, "secret.txt") },
-    );
+    const result = await createSandboxedExecutor({
+      isolation: "trusted-subprocess",
+    }).executeOnExecute(instance(join(directory, "plugin.mjs")), context(directory), {
+      path: join(outside, "secret.txt"),
+    });
     expect(result).toEqual(
-      expect.objectContaining({ success: false, error: expect.stringContaining("onExecute failed") }),
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining("onExecute failed"),
+      }),
     );
   });
 
   it("denies trusted-subprocess writes by default", async () => {
     const directory = plugin({
-      "plugin.mjs": "import {writeFileSync} from 'node:fs'; export function onExecute(){ writeFileSync('created.txt','blocked'); }",
+      "plugin.mjs":
+        "import {writeFileSync} from 'node:fs'; export function onExecute(){ writeFileSync('created.txt','blocked'); }",
     });
-    const result = await createSandboxedExecutor({ isolation: "trusted-subprocess" }).executeOnExecute(
-      instance(join(directory, "plugin.mjs")),
-      context(directory),
-      {},
-    );
+    const result = await createSandboxedExecutor({
+      isolation: "trusted-subprocess",
+    }).executeOnExecute(instance(join(directory, "plugin.mjs")), context(directory), {});
     expect(result.success).toBe(false);
     expect(existsSync(join(directory, "created.txt"))).toBe(false);
   });
 
   it("bounds execution time and output", async () => {
     const slowDirectory = plugin({
-      "plugin.mjs": "export async function onExecute(){ await new Promise(r=>setTimeout(r,250)); return 'late'; }",
+      "plugin.mjs":
+        "export async function onExecute(){ await new Promise(r=>setTimeout(r,250)); return 'late'; }",
     });
     expect(
       await createSandboxedExecutor({
         isolation: "trusted-subprocess",
         timeoutMs: 50,
-      }).executeOnExecute(
-        instance(join(slowDirectory, "plugin.mjs")),
-        context(slowDirectory),
-        {},
-      ),
+      }).executeOnExecute(instance(join(slowDirectory, "plugin.mjs")), context(slowDirectory), {}),
     ).toEqual({ success: false, error: "onExecute timed out after 50ms" });
 
     const noisyDirectory = plugin({
@@ -206,7 +207,10 @@ describe("plugin trust boundary", () => {
         context(failingDirectory),
       ),
     ).toEqual(
-      expect.objectContaining({ success: false, error: expect.stringContaining("subprocess boom") }),
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining("subprocess boom"),
+      }),
     );
 
     const trustedDirectory = plugin({

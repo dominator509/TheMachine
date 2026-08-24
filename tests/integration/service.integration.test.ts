@@ -19,10 +19,7 @@ import {
 } from "@the-machine/service";
 import { createUI } from "@the-machine/ui-components";
 import type { EntityId, ProviderTier, SemVer } from "@the-machine/core";
-import type {
-  ProductionApproval,
-  ReadinessEvidenceSource,
-} from "@the-machine/service";
+import type { ProductionApproval, ReadinessEvidenceSource } from "@the-machine/service";
 
 const cleanup: string[] = [];
 
@@ -128,13 +125,9 @@ describe("service handler integration", () => {
     ).toBe(true);
 
     const mcp = createMCPHandler();
-    const server = mcp.register(
-      "mcp" as EntityId,
-      "stdio-tools",
-      "stdio",
-      process.execPath,
-      ["read-file"],
-    );
+    const server = mcp.register("mcp" as EntityId, "stdio-tools", "stdio", process.execPath, [
+      "read-file",
+    ]);
     expect(server.healthy).toBe(false);
     expect(mcp.recordHealth("mcp" as EntityId, true, "initialize+tools/list")?.healthy).toBe(true);
 
@@ -179,33 +172,19 @@ describe("service handler integration", () => {
       30_000,
       decision,
     );
-    providers.recordHealth("provider" as EntityId, true, "HTTP probe and completion fixture passed");
+    providers.recordHealth(
+      "provider" as EntityId,
+      true,
+      "HTTP probe and completion fixture passed",
+    );
 
     const mcp = createMCPHandler();
-    mcp.register(
-      "mcp" as EntityId,
-      "mcp",
-      "stdio",
-      process.execPath,
-      ["read-file"],
-      decision,
-    );
+    mcp.register("mcp" as EntityId, "mcp", "stdio", process.execPath, ["read-file"], decision);
     mcp.recordHealth("mcp" as EntityId, true, "initialize and tools/call fixture passed");
 
     const plugins = createPluginHandler();
-    plugins.register(
-      "plugin" as EntityId,
-      "plugin",
-      "1.0.0" as SemVer,
-      "plugin.mjs",
-      0,
-      decision,
-    );
-    plugins.recordActivation(
-      "plugin" as EntityId,
-      true,
-      "trusted-subprocess policy suite passed",
-    );
+    plugins.register("plugin" as EntityId, "plugin", "1.0.0" as SemVer, "plugin.mjs", 0, decision);
+    plugins.recordActivation("plugin" as EntityId, true, "trusted-subprocess policy suite passed");
 
     const approval = createProductionApprovalHandler();
     approval.record(acceptedApproval("workspace" as EntityId));

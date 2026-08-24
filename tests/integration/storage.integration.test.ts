@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { resolve } from "node:path";
 import {
   createInMemoryConnection,
   closeConnection,
@@ -318,9 +319,9 @@ describe("storage: backup/restore", () => {
     const backupPath = "/tmp/test_backup_" + Date.now() + ".db";
     const meta = await createBackup(conn, backupPath);
 
-    expect(meta.path).toBe(backupPath);
+    expect(meta.path).toBe(resolve(backupPath));
     expect(meta.sizeBytes).toBeGreaterThan(0);
-    expect(meta.migrationCount).toBe(1);
+    expect(meta.migrationCount).toBe(2);
     expect(meta.tableCount).toBeGreaterThanOrEqual(11);
     expect(meta.createdAt).toBeDefined();
 
@@ -397,7 +398,7 @@ describe("storage: migrations", () => {
   it("applies all migrations to a fresh database", () => {
     const conn = createInMemoryConnection();
     const applied = migrate(conn, ALL_MIGRATIONS);
-    expect(applied).toEqual(["M001_initial_schema"]);
+    expect(applied).toEqual(["M001_initial_schema", "M002_production_approvals"]);
     closeConnection(conn);
   });
 
@@ -414,7 +415,7 @@ describe("storage: migrations", () => {
     expect(listApplied(conn)).toEqual([]);
     migrate(conn, ALL_MIGRATIONS);
     const names = listApplied(conn);
-    expect(names).toEqual(["M001_initial_schema"]);
+    expect(names).toEqual(["M001_initial_schema", "M002_production_approvals"]);
     closeConnection(conn);
   });
 

@@ -118,7 +118,9 @@ describe("run-state event journal", () => {
     );
 
     expect(store.readEvents(manifest.runId)).toEqual([event(1)]);
-    expect(readFileSync(store.eventsPath(manifest.runId), "utf-8").trim().split("\n")).toHaveLength(1);
+    expect(readFileSync(store.eventsPath(manifest.runId), "utf-8").trim().split("\n")).toHaveLength(
+      1,
+    );
   });
 
   it("rejects gaps and conflicting sequence data rather than silently replaying", () => {
