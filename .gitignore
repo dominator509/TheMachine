@@ -72,3 +72,4 @@ COMM_BUFFER.md
 .machine/
 .*.machine-worktrees/
 .git-credentials
+apps/desktop/src-tauri/target/
