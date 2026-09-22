@@ -59,7 +59,14 @@ jobs:
           };
           result
           '''
-          if after in rust:
+          repaired = '''    let mut locked_child = child
+                  .lock()
+                  .map_err(|_| "job lock was poisoned".to_string())?;
+              locked_child
+                  .kill()
+                  .map_err(|error| format!("unable to terminate job: {error}"))
+          '''
+          if after in rust or repaired in rust:
               print("native cancellation lifetime is already repaired")
           elif before in rust:
               rust_path.write_text(rust.replace(before, after, 1), encoding="utf-8")

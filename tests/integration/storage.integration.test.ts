@@ -320,7 +320,7 @@ describe("storage: backup/restore", () => {
 
     expect(meta.path).toBe(backupPath);
     expect(meta.sizeBytes).toBeGreaterThan(0);
-    expect(meta.migrationCount).toBe(1);
+    expect(meta.migrationCount).toBe(2);
     expect(meta.tableCount).toBeGreaterThanOrEqual(11);
     expect(meta.createdAt).toBeDefined();
 
@@ -397,7 +397,7 @@ describe("storage: migrations", () => {
   it("applies all migrations to a fresh database", () => {
     const conn = createInMemoryConnection();
     const applied = migrate(conn, ALL_MIGRATIONS);
-    expect(applied).toEqual(["M001_initial_schema"]);
+    expect(applied).toEqual(["M001_initial_schema", "M002_production_approvals"]);
     closeConnection(conn);
   });
 
@@ -414,7 +414,7 @@ describe("storage: migrations", () => {
     expect(listApplied(conn)).toEqual([]);
     migrate(conn, ALL_MIGRATIONS);
     const names = listApplied(conn);
-    expect(names).toEqual(["M001_initial_schema"]);
+    expect(names).toEqual(["M001_initial_schema", "M002_production_approvals"]);
     closeConnection(conn);
   });
 

@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  emitToGUI,
-  emitToGUIAsync,
-} from "../packages/observability/src/emit/emitToGUI";
+import { emitToGUI, emitToGUIAsync } from "../packages/observability/src/emit/emitToGUI";
 
 const originalFetch = globalThis.fetch;
 let lastPostedBody: string | null = null;
@@ -107,10 +104,7 @@ describe("emitToGUI (fire-and-forget)", () => {
 
   it("fails closed without an event-producer capability", async () => {
     mockFetch(new Response(null, { status: 200 }));
-    const result = await emitToGUIAsync(
-      { agentId: 1 },
-      { webhookUrl: "http://test/api/pipe" },
-    );
+    const result = await emitToGUIAsync({ agentId: 1 }, { webhookUrl: "http://test/api/pipe" });
     expect(result.success).toBe(false);
     expect(result.reason).toContain("missing event-producer capability");
     expect(lastPostedBody).toBeNull();

@@ -97,7 +97,10 @@ jobs:
         run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 
       - name: Build native installer bundle
-        run: pnpm --filter @the-machine/desktop tauri build
+        # WiX/MSI requires a numeric-only prerelease identifier, which the
+        # project's 0.3.0-alpha.1 version scheme cannot satisfy; NSIS degrades
+        # the version gracefully, so Windows bundles NSIS only.
+        run: pnpm --filter @the-machine/desktop tauri build ${{ runner.os == 'Windows' && '--bundles nsis' || '' }}
 
       - name: Collect digest-bound installers
         run: >-

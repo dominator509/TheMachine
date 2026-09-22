@@ -4,13 +4,7 @@
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,7 +28,9 @@ function gitSha() {
     shell: false,
   });
   if (result.status !== 0 || !result.stdout.trim()) {
-    throw new Error(`Unable to pin candidate SHA: ${result.stderr || result.error?.message || "unknown"}`);
+    throw new Error(
+      `Unable to pin candidate SHA: ${result.stderr || result.error?.message || "unknown"}`,
+    );
   }
   return result.stdout.trim();
 }
@@ -108,16 +104,127 @@ function fileGate(id, filePath, subsystems) {
 }
 
 const definitions = [
-  { id: "lint", executable: PNPM, args: ["lint"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
-  { id: "format", executable: PNPM, args: ["format:check"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
-  { id: "typecheck", executable: PNPM, args: ["typecheck"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
-  { id: "unit", executable: PNPM, args: ["test:unit"], subsystems: ["core", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
-  { id: "integration", executable: PNPM, args: ["test:integration"], subsystems: ["storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli"] },
-  { id: "build", executable: PNPM, args: ["build"], subsystems: ["core", "storage", "service", "providers", "mcp", "security", "observability", "agent-runtime", "plugin-sdk", "cli", "desktop", "ui-components"] },
-  { id: "e2e", executable: PNPM, args: ["test:e2e"], subsystems: ["service", "agent-runtime", "cli", "ui-components"] },
-  { id: "benchmark-smoke", executable: PNPM, args: ["benchmark:smoke"], subsystems: ["agent-runtime", "cli"] },
+  {
+    id: "lint",
+    executable: PNPM,
+    args: ["lint"],
+    subsystems: [
+      "core",
+      "storage",
+      "service",
+      "providers",
+      "mcp",
+      "security",
+      "observability",
+      "agent-runtime",
+      "plugin-sdk",
+      "cli",
+      "desktop",
+      "ui-components",
+    ],
+  },
+  {
+    id: "format",
+    executable: PNPM,
+    args: ["format:check"],
+    subsystems: [
+      "core",
+      "storage",
+      "service",
+      "providers",
+      "mcp",
+      "security",
+      "observability",
+      "agent-runtime",
+      "plugin-sdk",
+      "cli",
+      "desktop",
+      "ui-components",
+    ],
+  },
+  {
+    id: "typecheck",
+    executable: PNPM,
+    args: ["typecheck"],
+    subsystems: [
+      "core",
+      "storage",
+      "service",
+      "providers",
+      "mcp",
+      "security",
+      "observability",
+      "agent-runtime",
+      "plugin-sdk",
+      "cli",
+      "desktop",
+      "ui-components",
+    ],
+  },
+  {
+    id: "unit",
+    executable: PNPM,
+    args: ["test:unit"],
+    subsystems: [
+      "core",
+      "security",
+      "observability",
+      "agent-runtime",
+      "plugin-sdk",
+      "cli",
+      "desktop",
+      "ui-components",
+    ],
+  },
+  {
+    id: "build",
+    executable: PNPM,
+    args: ["build"],
+    subsystems: [
+      "core",
+      "storage",
+      "service",
+      "providers",
+      "mcp",
+      "security",
+      "observability",
+      "agent-runtime",
+      "plugin-sdk",
+      "cli",
+      "desktop",
+      "ui-components",
+    ],
+  },
+  {
+    id: "integration",
+    executable: PNPM,
+    args: ["test:integration"],
+    subsystems: [
+      "storage",
+      "service",
+      "providers",
+      "mcp",
+      "security",
+      "observability",
+      "agent-runtime",
+      "plugin-sdk",
+      "cli",
+    ],
+  },
+  {
+    id: "e2e",
+    executable: PNPM,
+    args: ["test:e2e"],
+    subsystems: ["service", "agent-runtime", "cli", "ui-components"],
+  },
+  {
+    id: "benchmark-smoke",
+    executable: PNPM,
+    args: ["benchmark:smoke"],
+    subsystems: ["agent-runtime", "cli"],
+  },
   { id: "secret-scan", executable: PNPM, args: ["security:check"], subsystems: ["security"] },
-  { id: "dependency-audit", executable: PNPM, args: ["audit"], subsystems: ["security"] },
+  { id: "dependency-audit", executable: PNPM, args: ["run", "audit"], subsystems: ["security"] },
   { id: "release-build", executable: PNPM, args: ["build:release"], subsystems: ["cli"] },
   { id: "smoke", executable: PNPM, args: ["smoke"], subsystems: ["service", "cli"] },
 ];
@@ -201,7 +308,9 @@ for (const gate of gates) {
 }
 console.log(`Evidence: ${evidencePath}`);
 if (blockingFailures.length > 0) {
-  console.error(`Production readiness: failed (${String(blockingFailures.length)} blocking gate(s))`);
+  console.error(
+    `Production readiness: failed (${String(blockingFailures.length)} blocking gate(s))`,
+  );
   process.exit(1);
 }
 console.log("Production readiness: ok");

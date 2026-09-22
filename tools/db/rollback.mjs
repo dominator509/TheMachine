@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { isTempPath, loadStorageApi, resolveDbPath } from "./common.mjs";
 
-const backupArgument = process.argv.find((argument) => !argument.startsWith("--"));
+const backupArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
 const approved = process.argv.includes("--yes");
 const expectedSha256 = process.argv
   .find((argument) => argument.startsWith("--sha256="))
@@ -23,8 +23,7 @@ if (!existsSync(backupPath)) {
   process.exit(1);
 }
 
-const rollbackAuthorized =
-  isTempPath(targetPath) || process.env.MACHINE_ALLOW_DB_ROLLBACK === "1";
+const rollbackAuthorized = isTempPath(targetPath) || process.env.MACHINE_ALLOW_DB_ROLLBACK === "1";
 if (!approved || !rollbackAuthorized) {
   console.error("Rollback refused.");
   console.error("Required: --yes and MACHINE_ALLOW_DB_ROLLBACK=1.");

@@ -31,6 +31,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": ["icons/icon.png", "icons/icon.ico"],
     "createUpdaterArtifacts": false,
     "shortDescription": "Durable local-first control plane for coding agents",
     "longDescription": "The Machine supervises isolated, restartable coding-agent delivery runs with approvals, policy gates, deterministic validation, evidence, and recovery."

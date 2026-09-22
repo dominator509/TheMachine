@@ -11,11 +11,15 @@ function createMCPFixture(): { executable: string; args: string[] } {
   const script = join(dir, "fixture.mjs");
   writeFileSync(
     script,
-    `let input = "";
+    `let buffer = "";
 process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", () => {
-  for (const line of input.split(/\\r?\\n/).filter(Boolean)) {
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let index;
+  while ((index = buffer.indexOf("\\n")) >= 0) {
+    const line = buffer.slice(0, index).trim();
+    buffer = buffer.slice(index + 1);
+    if (!line) continue;
     const req = JSON.parse(line);
     if (req.method === "initialize") {
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { protocolVersion: req.params.protocolVersion, capabilities: {}, serverInfo: { name: "fixture", version: "1" } } }) + "\\n");

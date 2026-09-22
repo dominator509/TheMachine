@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 /** Capability-scoped local GUI server for development and screenshot capture. */
-import {
-  getGuiServerAccess,
-  startGuiServer,
-} from "../packages/service/dist/gui/pipelineServer.js";
+import { getGuiServerAccess, startGuiServer } from "../packages/service/dist/gui/pipelineServer.js";
 
 const port = Number(process.env.MACHINE_GUI_PORT || 3099);
 const server = startGuiServer({ port });

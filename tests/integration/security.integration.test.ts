@@ -20,16 +20,26 @@ function createMCPFixture(): string {
   const script = join(dir, "fixture.mjs");
   writeFileSync(
     script,
-    `let input = "";
+    `let buffer = "";
 process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", () => {
-  const req = JSON.parse(input);
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { ok: true } }));
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let index;
+  while ((index = buffer.indexOf("\\n")) >= 0) {
+    const line = buffer.slice(0, index).trim();
+    buffer = buffer.slice(index + 1);
+    if (!line) continue;
+    const req = JSON.parse(line);
+    if (req.method === "initialize") {
+      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { protocolVersion: "2025-06-18", capabilities: {}, serverInfo: { name: "sec-fixture", version: "1" } } }) + "\\n");
+    } else if (req.method === "tools/call") {
+      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { ok: true } }) + "\\n");
+    }
+  }
 });`,
     "utf-8",
   );
-  return `"${process.execPath}" "${script}"`;
+  return script;
 }
 
 const providerFetch: ProviderFetch = async () =>
@@ -71,12 +81,14 @@ describe("secure command registry", () => {
 describe("secure MCP registry", () => {
   it("should deny unpermitted tools", () => {
     const permissions = createPermissionRegistry();
+    const mcpFixture = createMCPFixture();
     const inner = createMCPRegistry();
     inner.register({
       id: "mcp-1" as unknown as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: createMCPFixture(),
+      endpoint: process.execPath,
+      args: [mcpFixture],
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });
@@ -95,12 +107,14 @@ describe("secure MCP registry", () => {
       allowed: true,
       requireApproval: false,
     });
+    const mcpFixture = createMCPFixture();
     const inner = createMCPRegistry();
     inner.register({
       id: "mcp-1" as unknown as EntityId,
       name: "file-tools",
       transport: "stdio",
-      endpoint: createMCPFixture(),
+      endpoint: process.execPath,
+      args: [mcpFixture],
       tools: [{ name: "read-file", description: "Read a file", inputSchema: {} }],
       permissions: [{ toolName: "read-file", allowed: true, requireApproval: false }],
     });

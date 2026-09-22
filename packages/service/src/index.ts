@@ -10,6 +10,8 @@ export {
   startGuiServer,
   stopGuiServer,
   getSseClientCount,
+  getGuiServerAccess,
+  getGuiServerConfig,
   listThemes,
   loadTheme,
 } from "./gui/index.js";
