@@ -85,8 +85,8 @@ describe("DiagnosticBundle (integration)", () => {
 
   it("should redact API keys in extraData", () => {
     const bundle = exportDiagnosticBundle(defaultConfig, {
-      apiKey: "sk-proj-ABCDEF1234567890ABCDEF1234567890ABCDEF12",
-      token: "ghp_ABCDEF1234567890ABCDEF1234567890ABCDEF1234",
+      apiKey: "sk-proj-REDACTED",
+      token: "ghp_REDACTED",
     });
 
     expect(bundle.redactionApplied).toBe(true);
@@ -99,7 +99,8 @@ describe("DiagnosticBundle (integration)", () => {
 
   it("should redact secrets in nested objects", () => {
     const bundle = exportDiagnosticBundle(defaultConfig, {
-      credentials: {
+      // Non-sensitive container key, so nested values are redacted per key.
+      database: {
         password: "supersecret123!@#",
         username: "admin",
       },
@@ -109,9 +110,10 @@ describe("DiagnosticBundle (integration)", () => {
     const extra = bundle.sections.find((s) => s.label === "extra");
     expect(extra).toBeDefined();
     expect(extra!.redacted).toBe(true);
-    expect((extra!.data.credentials as Record<string, unknown>).password as string).toContain(
+    expect((extra!.data.database as Record<string, unknown>).password as string).toContain(
       "[REDACTED",
     );
+    expect((extra!.data.database as Record<string, unknown>).username).toBe("admin");
   });
 
   it("should redact plain string values that look like secrets", () => {
@@ -129,16 +131,28 @@ describe("DiagnosticBundle (integration)", () => {
 
   it("should redact secrets in arrays", () => {
     const bundle = exportDiagnosticBundle(defaultConfig, {
-      tokens: ["ghp_ABCDEF1234567890ABCDEF1234567890ABCDEF1234", "safe-token-value"],
+      items: ["sk-arraytestsecret0123456789", "safe-token-value"],
     });
 
     expect(bundle.redactionApplied).toBe(true);
     const extra = bundle.sections.find((s) => s.label === "extra");
     expect(extra).toBeDefined();
-    const tokens = extra!.data.tokens as string[];
+    const tokens = extra!.data.items as string[];
     expect(tokens[0]).toContain("[REDACTED");
     // Non-secret values should remain unchanged
     expect(tokens[1]).toBe("safe-token-value");
+  });
+
+  it("should redact entire values under sensitive keys", () => {
+    const bundle = exportDiagnosticBundle(defaultConfig, {
+      tokens: ["test-token-value", "safe-token-value"],
+    });
+
+    expect(bundle.redactionApplied).toBe(true);
+    const extra = bundle.sections.find((s) => s.label === "extra");
+    expect(extra).toBeDefined();
+    // "tokens" is a sensitive key, so the whole value is redacted at once.
+    expect(extra!.data.tokens).toBe("[REDACTED]");
   });
 
   it("should produce a JSON-serializable bundle", () => {

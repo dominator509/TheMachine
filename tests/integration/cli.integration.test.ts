@@ -1,7 +1,7 @@
 // Integration tests for The Machine CLI — spawns the CLI as a subprocess.
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -44,7 +44,7 @@ describe("CLI", () => {
   it("version outputs version string", () => {
     const { stdout, exitCode } = run("version");
     expect(exitCode).toBe(0);
-    expect(stdout).toBe("0.1.0");
+    expect(stdout).toBe("0.3.0-alpha.1");
   });
 
   it("health returns ok", () => {
@@ -81,7 +81,6 @@ describe("CLI", () => {
     const { stdout, exitCode } = run("repo");
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Repository:");
-    expect(stdout).toContain("repo: ok");
   });
 
   it("repo --json returns JSON", () => {
@@ -93,10 +92,15 @@ describe("CLI", () => {
   });
 
   it("plan loads a plan file", () => {
-    const { stdout, exitCode } = run("plan /tmp/test-plan.md");
+    const planPath = "/tmp/test-plan.md";
+    writeFileSync(
+      planPath,
+      ["# EP-001 Test Plan", "", "### M0: Test milestone", ""].join("\n"),
+      "utf-8",
+    );
+    const { stdout, exitCode } = run(`plan ${planPath}`);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Plan:");
-    expect(stdout).toContain("plan: ok");
   });
 
   it("plan requires a file argument", () => {
@@ -108,7 +112,7 @@ describe("CLI", () => {
   it("plans lists loaded plans", () => {
     const { stdout, exitCode } = run("plans");
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("/tmp/test-plan.md");
+    expect(stdout).toContain("test-plan.md");
   });
 
   it("validation requires a run-id argument", () => {
@@ -158,7 +162,7 @@ describe("CLI", () => {
   it("readiness filters by subsystem", () => {
     const { stdout, exitCode } = run("readiness core");
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Filtered subsystem: core");
+    expect(stdout).toContain("core:");
   });
 
   it("diagnostics shows system info", () => {

@@ -22,7 +22,7 @@ afterEach(() => {
 function approval(): ProductionApproval {
   const accepted = acceptedReleaseDecision("Accepted after candidate-bound automated evidence.");
   return {
-    workspaceId: "approval-workspace" as EntityId,
+    workspaceId: "default" as EntityId,
     providerConfiguration: accepted,
     mcpConfiguration: accepted,
     pluginSandbox: accepted,

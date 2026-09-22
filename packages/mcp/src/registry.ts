@@ -1,6 +1,7 @@
 // MCP registry implementation with approval checks and a persistent shell-free stdio client.
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { EntityId } from "@the-machine/core";
@@ -16,7 +17,19 @@ const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
-const STDIO_HELPER = fileURLToPath(new URL("./stdio-helper.js", import.meta.url));
+/**
+ * Locate the compiled stdio helper. In production it sits next to this
+ * module; when @the-machine/mcp is loaded from source (vitest aliases the
+ * package to src/) the compiled file is not there, so fall back to the
+ * package build output — CI builds before running integration tests.
+ */
+function resolveStdioHelperPath(): string {
+  const sibling = fileURLToPath(new URL("./stdio-helper.js", import.meta.url));
+  if (existsSync(sibling)) return sibling;
+  return fileURLToPath(new URL("../dist/stdio-helper.js", import.meta.url));
+}
+
+const STDIO_HELPER = resolveStdioHelperPath();
 const DENIED_EXECUTABLES = new Set([
   "bash",
   "bash.exe",

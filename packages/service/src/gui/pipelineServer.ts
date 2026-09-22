@@ -110,7 +110,9 @@ function validTheme(value: unknown): value is ThemeManifest {
   if (!isRecord(value["chrome"]) || !isRecord(value["stations"]) || !isRecord(value["sprites"])) {
     return false;
   }
-  return Object.keys(value["stations"]).length <= 200 && Object.keys(value["sprites"]).length <= 500;
+  return (
+    Object.keys(value["stations"]).length <= 200 && Object.keys(value["sprites"]).length <= 500
+  );
 }
 
 function broadcastToSseClients(data: string): void {
@@ -154,7 +156,9 @@ function originAllowed(req: http.IncomingMessage, config: ResolvedGuiServerConfi
     return (
       parsed.protocol === "http:" &&
       actualPort === expectedPort &&
-      (config.allowRemote ? originHost === config.host.toLowerCase() : LOOPBACK_HOSTS.has(originHost))
+      (config.allowRemote
+        ? originHost === config.host.toLowerCase()
+        : LOOPBACK_HOSTS.has(originHost))
     );
   } catch {
     return false;
@@ -278,7 +282,11 @@ function handleTheme(res: http.ServerResponse, name: string): void {
   }
 }
 
-function handleSaveTheme(res: http.ServerResponse, body: string, config: ResolvedGuiServerConfig): void {
+function handleSaveTheme(
+  res: http.ServerResponse,
+  body: string,
+  config: ResolvedGuiServerConfig,
+): void {
   try {
     const parsed: unknown = JSON.parse(body);
     if (!validTheme(parsed)) {
@@ -316,7 +324,9 @@ function allowedStaticPath(filePath: string, config: ResolvedGuiServerConfig): b
   ];
   return roots.some((root) => {
     const relativePath = path.relative(root, resolved);
-    return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+    return (
+      relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+    );
   });
 }
 
@@ -355,7 +365,8 @@ function serveStatic(
       "Cache-Control": "no-store",
     };
     if (establishSession) {
-      headers["Set-Cookie"] = `${SESSION_COOKIE}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`;
+      headers["Set-Cookie"] =
+        `${SESSION_COOKIE}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`;
     }
     res.writeHead(200, headers);
     res.end(content);
@@ -427,7 +438,10 @@ async function handleRequest(
   }
 
   const hasSession = sessionAllowed(req, sessionToken);
-  const hasBootstrapCapability = safeTokenEqual(url.searchParams.get("access") ?? undefined, viewerToken);
+  const hasBootstrapCapability = safeTokenEqual(
+    url.searchParams.get("access") ?? undefined,
+    viewerToken,
+  );
   const canBootstrap =
     (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/builder") &&
     hasBootstrapCapability;
@@ -438,7 +452,11 @@ async function handleRequest(
   serveStatic(res, config, url.pathname, sessionToken, canBootstrap);
 }
 
-function createAccess(config: ResolvedGuiServerConfig, viewerToken: string, eventToken: string): GuiServerAccess {
+function createAccess(
+  config: ResolvedGuiServerConfig,
+  viewerToken: string,
+  eventToken: string,
+): GuiServerAccess {
   const base = `http://${config.host}:${String(config.port)}`;
   return {
     dashboardUrl: `${base}/?access=${encodeURIComponent(viewerToken)}`,

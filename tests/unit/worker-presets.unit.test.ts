@@ -51,7 +51,9 @@ describe("first-class worker presets", () => {
   });
 
   it("uses the current Codex exec contract and removes fabricated flags", () => {
-    const descriptor = createBuiltinWorkers().map(describeWorker).find((item) => item.id === "codex");
+    const descriptor = createBuiltinWorkers()
+      .map(describeWorker)
+      .find((item) => item.id === "codex");
     expect(descriptor?.invocationTemplate).toEqual([
       "exec",
       "--json",

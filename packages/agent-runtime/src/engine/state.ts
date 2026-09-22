@@ -93,6 +93,7 @@ function parseJsonLines<T>(filePath: string, label: string): T[] {
     } catch (error) {
       throw new Error(
         `${label} contains invalid JSON at line ${String(index + 1)}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       );
     }
   }
@@ -229,9 +230,17 @@ export class RunStateStore {
     this.recoverPendingEventTransaction(manifest.runId);
     const persisted = parseJsonFile<RunManifest>(this.manifestPath(manifest.runId));
     if (persisted.nextSequence !== manifest.nextSequence) {
-      throw new Error(
-        `Run '${manifest.runId}' manifest is stale: expected sequence ${String(persisted.nextSequence)}, received ${String(manifest.nextSequence)}.`,
-      );
+      // An external cancel() journals through its own store instance while an
+      // executor is running, legitimately advancing the persisted sequence
+      // past the executor's in-memory copy. Adopt its sequence so the run can
+      // shut down cleanly instead of failing on the next append. Any other
+      // concurrent writer still fails closed here.
+      if (!this.isCancellationRequested(manifest.runId)) {
+        throw new Error(
+          `Run '${manifest.runId}' manifest is stale: expected sequence ${String(persisted.nextSequence)}, received ${String(manifest.nextSequence)}.`,
+        );
+      }
+      manifest.nextSequence = persisted.nextSequence;
     }
 
     const recorded: RunEvent = {
@@ -256,7 +265,13 @@ export class RunStateStore {
     durableAppend(this.eventsPath(manifest.runId), `${JSON.stringify(recorded)}\n`);
     atomicWrite(this.manifestPath(manifest.runId), `${JSON.stringify(nextManifest, null, 2)}\n`);
     durableRemove(this.eventTransactionPath(manifest.runId));
-    Object.assign(manifest, nextManifest);
+    // Sync only the fields appendEvent owns. A shallow Object.assign of the
+    // cloned manifest would replace nested objects (taskStates, approvals,
+    // metrics, ...) with clones and silently detach every reference the
+    // orchestrator already holds, losing in-memory mutations made after the
+    // event is recorded.
+    manifest.nextSequence = nextManifest.nextSequence;
+    manifest.updatedAt = nextManifest.updatedAt;
     return recorded;
   }
 
@@ -270,10 +285,7 @@ export class RunStateStore {
   }
 
   readApprovals(runId: string): ApprovalRecord[] {
-    return parseJsonLines<ApprovalRecord>(
-      this.approvalsPath(runId),
-      `Run '${runId}' approval log`,
-    );
+    return parseJsonLines<ApprovalRecord>(this.approvalsPath(runId), `Run '${runId}' approval log`);
   }
 
   latestApproval(

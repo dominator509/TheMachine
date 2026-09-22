@@ -100,6 +100,10 @@ function* walk(directory) {
       throw new Error(`Native artifact collection refuses symbolic links: ${path}`);
     }
     if (metadata.isDirectory()) {
+      // AppImage bundling leaves a "<name>.AppDir" staging directory next to the
+      // finished .AppImage. It is intermediate build output (and contains
+      // symlinks), not a distributable installer artifact, so skip it.
+      if (entry.name.endsWith(".AppDir")) continue;
       yield* walk(path);
     } else if (metadata.isFile() && statSync(path).size > 0) {
       yield path;

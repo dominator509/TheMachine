@@ -3,14 +3,7 @@
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,7 +52,12 @@ function check(name, fn) {
   }
 }
 
-for (const required of [CLI_PATH, join(ROOT, "packages", "service", "dist", "index.js"), MANIFEST_PATH, CHECKSUM_PATH]) {
+for (const required of [
+  CLI_PATH,
+  join(ROOT, "packages", "service", "dist", "index.js"),
+  MANIFEST_PATH,
+  CHECKSUM_PATH,
+]) {
   if (!existsSync(required)) {
     console.error(`Smoke prerequisite missing: ${required}`);
     console.error("Run `pnpm build` and `pnpm build:release` first.");
@@ -126,7 +124,8 @@ check("release checksums match every declared artifact", () => {
 
 const tarballs = (manifest.artifacts ?? []).filter((artifact) => artifact.type === "npm-tarball");
 check("release contains exactly one installable CLI tarball", () => {
-  if (tarballs.length !== 1) throw new Error(`expected one CLI tarball, received ${String(tarballs.length)}`);
+  if (tarballs.length !== 1)
+    throw new Error(`expected one CLI tarball, received ${String(tarballs.length)}`);
   if (!tarballs[0].path.endsWith(".tgz")) throw new Error("CLI artifact is not an npm tarball");
 });
 
@@ -158,7 +157,8 @@ if (tarballs.length === 1 && process.env.MACHINE_SMOKE_SKIP_CLEAN_ROOM !== "1") 
         ? join(cleanRoom, "node_modules", ".bin", "machine.cmd")
         : join(cleanRoom, "node_modules", ".bin", "machine");
     check("installed artifact reports exact version", () => {
-      if (!existsSync(installedBin)) throw new Error(`installed executable missing: ${installedBin}`);
+      if (!existsSync(installedBin))
+        throw new Error(`installed executable missing: ${installedBin}`);
       const output = execute(installedBin, ["version"], cleanRoom);
       if (!output.includes(VERSION)) throw new Error(`installed version mismatch: ${output}`);
     });

@@ -13,14 +13,34 @@ const ICON_PNG: &[u8] = &[
     130,
 ];
 
+/// Wrap the embedded 32x32 PNG in a single-image ICO container.
+/// PNG-compressed icon entries are valid ICO (Vista+) and are passed through
+/// to the Windows resource compiler by tauri-build.
+fn icon_ico_bytes() -> Vec<u8> {
+    let mut ico = Vec::with_capacity(22 + ICON_PNG.len());
+    // ICONDIR: reserved = 0, type = 1 (icon), count = 1
+    ico.extend_from_slice(&[0, 0, 1, 0, 1, 0]);
+    // ICONDIRENTRY: 32x32, no palette, reserved = 0, planes = 1, 32bpp
+    ico.extend_from_slice(&[32, 32, 0, 0, 1, 0, 32, 0]);
+    ico.extend_from_slice(&(ICON_PNG.len() as u32).to_le_bytes());
+    ico.extend_from_slice(&22u32.to_le_bytes());
+    ico.extend_from_slice(ICON_PNG);
+    ico
+}
+
 fn ensure_icon() {
     let icon_directory = Path::new("icons");
     let icon_path = icon_directory.join("icon.png");
-    if icon_path.exists() {
-        return;
+    let ico_path = icon_directory.join("icon.ico");
+    if !icon_path.exists() {
+        fs::create_dir_all(icon_directory).expect("create Tauri icon directory");
+        fs::write(&icon_path, ICON_PNG).expect("write deterministic Tauri icon");
     }
-    fs::create_dir_all(icon_directory).expect("create Tauri icon directory");
-    fs::write(icon_path, ICON_PNG).expect("write deterministic Tauri icon");
+    // tauri-build requires icons/icon.ico to generate the Windows resource file.
+    if !ico_path.exists() {
+        fs::create_dir_all(icon_directory).expect("create Tauri icon directory");
+        fs::write(&ico_path, icon_ico_bytes()).expect("write deterministic Tauri icon (.ico)");
+    }
 }
 
 fn main() {

@@ -34,20 +34,20 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22.13.1"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
           version: 11.6.0
           run_install: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         if: inputs.worker == 'aider' || inputs.worker == 'openhands'
         with:
           python-version: "3.12"
@@ -60,15 +60,15 @@ jobs:
 
       - name: Install Codex CLI
         if: inputs.worker == 'codex'
-        run: npm install --global @openai/codex@latest
+        run: npm install --global @openai/codex@0.155.1
 
       - name: Install Claude Code
         if: inputs.worker == 'claude-code'
-        run: npm install --global @anthropic-ai/claude-code@latest
+        run: npm install --global @anthropic-ai/claude-code@2.1.278
 
       - name: Install Aider
         if: inputs.worker == 'aider'
-        run: python -m pip install --disable-pip-version-check aider-chat
+        run: python -m pip install --disable-pip-version-check aider-chat==0.86.2
 
       - name: Install OpenHands
         if: inputs.worker == 'openhands'
@@ -100,7 +100,7 @@ jobs:
 
       - name: Upload raw and Markdown reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: machine-benchmark-${{ inputs.worker }}-${{ inputs.suite }}
           path: benchmark-results/

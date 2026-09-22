@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import {
-  ensureDbDirectory,
-  loadStorageApi,
-  resolveDbPath,
-  ROOT,
-} from "./common.mjs";
+import { ensureDbDirectory, loadStorageApi, resolveDbPath, ROOT } from "./common.mjs";
 
 const databasePath = resolveDbPath();
 if (!existsSync(databasePath)) {

@@ -621,6 +621,10 @@ export class AgenticRuntime {
       const workerFailure = await this.runWorker(store, manifest, task, state, attempt, worker);
       if (workerFailure) {
         await this.failAttempt(store, manifest, state, attempt, workerFailure);
+        if (workerFailure.category === "cancelled") {
+          this.markCancelled(store, manifest, state);
+          return false;
+        }
         if (!workerFailure.retryable) break;
         continue;
       }

@@ -34,16 +34,21 @@ describe("db tools", () => {
   it("guards rollback unless explicit rollback intent is provided", () => {
     const dir = mkdtempSync(join(tmpdir(), "machine-db-rollback-"));
     const dbPath = join(dir, "the-machine.db");
+    const backupPath = join(dir, "pre-upgrade.sqlite");
 
-    expect(() => runTool("tools/db/rollback.mjs", { MACHINE_DB_PATH: dbPath })).toThrow(
-      /Rollback stopped/,
+    runTool("tools/db/setup.mjs", { MACHINE_DB_PATH: dbPath });
+    runTool("tools/db/backup.mjs", { MACHINE_DB_PATH: dbPath }, [backupPath]);
+
+    expect(() =>
+      runTool("tools/db/rollback.mjs", { MACHINE_DB_PATH: dbPath }, [backupPath]),
+    ).toThrow(/Rollback refused/);
+
+    const output = runTool(
+      "tools/db/rollback.mjs",
+      { MACHINE_DB_PATH: dbPath, MACHINE_ALLOW_DB_ROLLBACK: "1" },
+      [backupPath, "--yes"],
     );
-
-    const output = runTool("tools/db/rollback.mjs", {
-      MACHINE_DB_PATH: dbPath,
-      MACHINE_ALLOW_DB_ROLLBACK: "1",
-    });
-    expect(output).toContain("Rollback: no reversible down migrations are registered");
+    expect(output).toContain("Rollback restored and independently verified");
   });
 
   it("creates deterministic migration scaffolds in the requested directory", () => {
